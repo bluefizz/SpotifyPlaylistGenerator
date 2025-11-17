@@ -105,20 +105,17 @@ def ensure_spotify_authenticated():
         st.error("Spotify credentials not set in environment or secrets.")
         st.stop()
 
-    # Ensure each visitor has a unique cache path
+    # Unique cache per visitor session
     visitor_id = st.session_state.get('visitor_id')
     if not visitor_id:
-        visitor_id = str(int(time.time() * 1000))
+        visitor_id = str(int(time.time() * 1000))  # simple unique ID
         st.session_state['visitor_id'] = visitor_id
-
-    # Add user-read-private to scope for current_user()
-    auth_scope = "playlist-modify-public playlist-modify-private user-library-read user-read-private"
 
     sp_oauth = SpotifyOAuth(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri=REDIRECT_URI,
-        scope=auth_scope,
+        scope=SCOPE,
         show_dialog=True,
         cache_path=f".cache-{visitor_id}"
     )
@@ -134,36 +131,44 @@ def ensure_spotify_authenticated():
             st.session_state.pop("token_info", None)
             token_info = None
 
-    # Get token from redirect if not already available
+    # If no token, check for Spotify redirect
     if not token_info:
         query_params = st.experimental_get_query_params()
         if "code" in query_params:
             code = query_params["code"][0]
-            token_info = sp_oauth.get_access_token(code=code, check_cache=False)
-            if token_info:
-                st.session_state["token_info"] = token_info
-            st.experimental_set_query_params()  # clean URL
+            try:
+                token_info = sp_oauth.get_access_token(code)
+                if isinstance(token_info, dict):
+                    st.session_state["token_info"] = token_info
+                st.experimental_set_query_params()  # clean URL
+            except Exception as e:
+                st.error(f"Error fetching access token: {e}")
+                st.stop()
         else:
             auth_url = sp_oauth.get_authorize_url()
             st.markdown("### 🔐 Log in with your Spotify account")
             st.markdown(f"[Login here]({auth_url})")
             st.stop()
 
-    access_token = token_info.get("access_token")
+    # Use access token
+    access_token = token_info.get("access_token") if token_info else None
     if not access_token:
-        st.error("Failed to get Spotify access token. Check your Spotify credentials and redirect URI.")
+        st.error("Failed to get Spotify access token.")
         st.stop()
 
-    # Create Spotify client
+    # Initialize Spotify client
     sp_client = spotipy.Spotify(auth=access_token)
-    try:
-        st.session_state["current_user"] = sp_client.current_user()
-    except Exception as e:
-        st.error(f"Error fetching current user: {str(e)}")
-        st.stop()
-
     st.session_state["spotify_client"] = sp_client
 
+    # Get current user safely
+    try:
+        current_user = sp_client.current_user()
+        st.session_state["current_user"] = current_user
+    except spotipy.exceptions.SpotifyException as e:
+        st.error(f"Error fetching current user: {e}")
+        # Suggest clearing cache
+        st.info("💡 Try deleting any `.cache-*` files and logging in again.")
+        st.stop()
 
 # ==================== DATA GATHERING ====================
 
