@@ -86,13 +86,19 @@ def ensure_spotify_authenticated():
         st.error("Spotify credentials not set in environment or secrets.")
         st.stop()
 
+    # Ensure each visitor has a unique cache path to prevent using your account
+    visitor_id = st.session_state.get('visitor_id')
+    if not visitor_id:
+        visitor_id = str(int(time.time() * 1000))  # simple unique ID per session
+        st.session_state['visitor_id'] = visitor_id
+
     sp_oauth = SpotifyOAuth(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri=REDIRECT_URI,
         scope=SCOPE,
         show_dialog=True,
-        cache_path=None
+        cache_path=f".cache-{visitor_id}"
     )
 
     token_info = st.session_state.get("token_info")
