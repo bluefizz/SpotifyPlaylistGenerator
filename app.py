@@ -1,3 +1,7 @@
+# app_merged.py
+# Merged: v10 features/UI + app.py authentication (single file)
+# Sources: app.py (auth + cache cleanup) and v10.py (features/UI). See file citations in chat.
+
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -7,14 +11,14 @@ import json
 from collections import defaultdict
 import time
 from dotenv import load_dotenv
+import random
+import math
+import glob
 
 # Load environment variables (for local dev; on Streamlit Cloud use st.secrets)
 load_dotenv()
 
-
-import glob
-import os
-
+# ----------------- SMALL UTILS FROM app.py -----------------
 def clean_spotify_cache():
     """Delete any existing .cache-* files to force fresh Spotify login"""
     cache_files = glob.glob(".cache-*")
@@ -28,7 +32,7 @@ def clean_spotify_cache():
 # Call this early in your app, before Spotify OAuth
 clean_spotify_cache()
 
-# Page config
+# Page config (keep v10 look & feel)
 st.set_page_config(
     page_title="Vibescape - Party Playlist Generator",
     page_icon="🎵",
@@ -36,11 +40,11 @@ st.set_page_config(
 )
 
 # ==================== CONFIGURATION ====================
-# Cache file paths (used for playlist/genre caching only)
+# Cache file paths
 PLAYLIST_CACHE_FILE = "playlist_cache.json"
 GENRE_CACHE_FILE = "genre_cache.json"
 
-# Spotify API setup
+# Spotify API setup (same scope used in both originals)
 SCOPE = "playlist-modify-public playlist-modify-private user-library-read"
 
 # ==================== CACHE MANAGEMENT ====================
@@ -93,9 +97,7 @@ def cache_genres(artist_id, genres):
     }
     save_cache(GENRE_CACHE_FILE, cache)
 
-
-
-# ==================== SPOTIFY AUTHENTICATION (MULTI-USER SAFE) ====
+# ==================== SPOTIFY AUTHENTICATION (from app.py) ====================
 def ensure_spotify_authenticated():
     CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
     CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
@@ -138,6 +140,7 @@ def ensure_spotify_authenticated():
             code = query_params["code"][0]
             try:
                 token_info = sp_oauth.get_access_token(code)
+                # Some spotipy versions return dict, sometimes different object — handle dict case
                 if isinstance(token_info, dict):
                     st.session_state["token_info"] = token_info
                 st.experimental_set_query_params()  # clean URL
@@ -166,18 +169,16 @@ def ensure_spotify_authenticated():
         st.session_state["current_user"] = current_user
     except spotipy.exceptions.SpotifyException as e:
         st.error(f"Error fetching current user: {e}")
-        # Suggest clearing cache
         st.info("💡 Try deleting any `.cache-*` files and logging in again.")
         st.stop()
 
-# ==================== DATA GATHERING ====================
-
+# ==================== DATA GATHERING (from v10) ====================
 def validate_user_exists(sp, username):
     """Check if Spotify user exists and return user data"""
     try:
         user = sp.user(username)
         return True, user
-    except Exception:
+    except Exception as e:
         return False, None
 
 def get_user_playlists_data(sp, username, market):
@@ -287,7 +288,7 @@ def get_artist_genres(sp, artist_ids):
 
     return genres_map
 
-# ==================== FILTERING & RANKING ====================
+# ==================== FILTERING & RANKING (from v10 & app.py combined) ====================
 def parse_release_year(release_date):
     """Extract year from release date string"""
     try:
@@ -426,7 +427,8 @@ def allocate_tracks(tracks, allocation_mode, num_tracks, user_weights=None):
             if user in zero_weight_users:
                 user_targets[user] = 0
             else:
-                user_targets[user] = int(num_tracks * user_weights[user])
+                # floor to int; remainder filled later
+                user_targets[user] = int(num_tracks * user_weights.get(user, 0))
 
         user_selected = {user: 0 for user in user_tracks}
 
@@ -476,6 +478,9 @@ def allocate_tracks(tracks, allocation_mode, num_tracks, user_weights=None):
         'warnings': allocation_warnings
     }
 
+    # Shuffle to mix contributions
+    random.shuffle(selected[:num_tracks])
+
     return selected[:num_tracks], allocation_info
 
 def get_top_consensus_tracks(all_tracks, selected_track_ids, limit=10):
@@ -505,33 +510,223 @@ def get_top_consensus_tracks(all_tracks, selected_track_ids, limit=10):
 
     return unique_tracks[:limit]
 
-# ==================== UI COMPONENTS ====================
+# ==================== GENRE RECOMMENDER (v10 advanced logic) ====================
+def get_genre_recommendations(all_tracks, guests):
+    """New genre recommendation system with Consensus and Discovery logic"""
+    
+    # Count genres per user and total tracks per user
+    user_genres = defaultdict(lambda: defaultdict(int))
+    user_total_tracks = defaultdict(int)
+    
+    for track in all_tracks:
+        user = track['user_id']
+        user_total_tracks[user] += 1
+        for genre in track.get('genres', []):
+            user_genres[user][genre] += 1
+    
+    # Calculate proportions
+    user_genre_proportions = {}
+    for user in user_genres:
+        user_genre_proportions[user] = {}
+        total = user_total_tracks[user]
+        if total > 0:
+            for genre, count in user_genres[user].items():
+                user_genre_proportions[user][genre] = count / total
+    
+    num_users = len(guests)
+    
+    # ==================== CASE 1: Single User ====================
+    if num_users == 1:
+        user = guests[0]
+        genre_counts = user_genres.get(user, {})
+        if not genre_counts:
+            return [], [], "No genres found in user's playlists."
+        
+        top_5 = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        
+        consensus = [(genre, 1, count, 0) for genre, count in top_5]
+        discovery = []
+        discovery_message = "Discovery genres require at least 2 guests."
+        
+        return consensus, discovery, discovery_message
+    
+    # Determine eligibility threshold for Discovery
+    if num_users in (2, 3):
+        max_users_for_discovery = 1  # Only exclusive genres
+    else:
+        max_users_for_discovery = math.floor(num_users / 2)
+    
+    # ==================== CASE 2: Two Users ====================
+    if num_users == 2:
+        user1, user2 = guests[0], guests[1]
+        
+        # Consensus: absolute overlap
+        all_genres = set(user_genres[user1].keys()) | set(user_genres[user2].keys())
+        consensus_scores = []
+        
+        for genre in all_genres:
+            count1 = user_genres[user1].get(genre, 0)
+            count2 = user_genres[user2].get(genre, 0)
+            intersection = min(count1, count2)
+            if intersection > 0:
+                consensus_scores.append((genre, 2, intersection, 0))
+        
+        consensus_scores.sort(key=lambda x: x[2], reverse=True)
+        consensus = consensus_scores[:5]
+        consensus_genres = {g[0] for g in consensus}
+        
+        # Discovery: only genres held by exactly 1 user
+        discovery_candidates = []
+        for genre in all_genres:
+            if genre in consensus_genres:
+                continue
+            
+            users_with_genre = []
+            if genre in user_genres[user1]:
+                users_with_genre.append((user1, user_genres[user1][genre]))
+            if genre in user_genres[user2]:
+                users_with_genre.append((user2, user_genres[user2][genre]))
+            
+            # Must be held by exactly 1 user
+            if len(users_with_genre) == 1:
+                user, count = users_with_genre[0]
+                discovery_candidates.append((genre, user, count))
+        
+        # Sort by track count
+        discovery_candidates.sort(key=lambda x: x[2], reverse=True)
+        
+        # Apply 3-per-user limit with fairness
+        user_contribution_count = defaultdict(int)
+        discovery = []
+        
+        for genre, user, count in discovery_candidates:
+            if len(discovery) >= 5:
+                break
+            
+            # Check if user can contribute (max 3)
+            if user_contribution_count[user] < 3:
+                discovery.append((genre, [user], count))
+                user_contribution_count[user] += 1
+        
+        # Fairness fallback: if we still need more and one user has eligible genres
+        if len(discovery) < 5:
+            for genre, user, count in discovery_candidates:
+                if len(discovery) >= 5:
+                    break
+                if (genre, [user], count) not in discovery:
+                    discovery.append((genre, [user], count))
+        
+        discovery_message = "No discovery genres found - music tastes are similar." if not discovery else None
+        
+        return consensus, discovery, discovery_message
+    
+    # ==================== CASE 3: Three or More Users ====================
+    
+    # Consensus: requires at least half of users
+    min_users_required = math.ceil(num_users / 2)
+    all_genres = set()
+    for user_genre_dict in user_genres.values():
+        all_genres.update(user_genre_dict.keys())
+    
+    consensus_scores = []
+    for genre in all_genres:
+        users_with_genre = [u for u in guests if genre in user_genres[u]]
+        num_users_with_genre = len(users_with_genre)
+        
+        if num_users_with_genre < min_users_required:
+            continue
+        
+        # Normalized user count
+        normalized_user_count = num_users_with_genre / num_users
+        
+        # Average proportion
+        proportions = [user_genre_proportions[u][genre] for u in users_with_genre]
+        avg_proportion = sum(proportions) / len(proportions)
+        
+        # Consensus score
+        consensus_score = 0.9 * normalized_user_count + 0.1 * avg_proportion
+        
+        consensus_scores.append((genre, num_users_with_genre, avg_proportion, consensus_score))
+    
+    consensus_scores.sort(key=lambda x: x[3], reverse=True)
+    consensus = consensus_scores[:5]
+    consensus_genres = {g[0] for g in consensus}
+    
+    # Discovery: genres held by at most max_users_for_discovery users
+    discovery_candidates = []
+    for genre in all_genres:
+        if genre in consensus_genres:
+            continue
+        
+        users_with_genre = [u for u in guests if genre in user_genres[u]]
+        num_users_with_genre = len(users_with_genre)
+        
+        # Eligibility check
+        if num_users_with_genre == 0 or num_users_with_genre > max_users_for_discovery:
+            continue
+        
+        # Sum track counts from all users who have this genre
+        total_count = sum(user_genres[u][genre] for u in users_with_genre)
+        
+        discovery_candidates.append((genre, users_with_genre, total_count))
+    
+    # Sort by total count
+    discovery_candidates.sort(key=lambda x: x[2], reverse=True)
+    
+    # Apply 3-per-user limit with fairness
+    user_contribution_count = defaultdict(int)
+    discovery = []
+    
+    for genre, users_list, count in discovery_candidates:
+        if len(discovery) >= 5:
+            break
+        
+        # Check if any of the attributed users can still contribute
+        can_add = any(user_contribution_count[u] < 3 for u in users_list)
+        
+        if can_add:
+            discovery.append((genre, users_list, count))
+            for u in users_list:
+                user_contribution_count[u] += 1
+    
+    # Fairness fallback
+    if len(discovery) < 5:
+        for genre, users_list, count in discovery_candidates:
+            if len(discovery) >= 5:
+                break
+            if (genre, users_list, count) not in discovery:
+                discovery.append((genre, users_list, count))
+    
+    discovery_message = "No discovery genres found - music tastes are similar." if not discovery else None
+    
+    return consensus, discovery, discovery_message
 
+# ==================== UI (v10 layout, but with ensure_spotify_authenticated) ====================
 def main():
     st.title("🎵 Vibescape - Party Playlist Generator")
     st.markdown("Create the perfect party playlist from your friends' Spotify music tastes!")
-
+    
     # Landing page info box
     st.info("""
     💡 **Tip for Best Results:**  
     For a more accurate and personalized mix, guests should temporarily make some of their playlists public. 
     The more public playlists available, the better the playlist will reflect everyone's taste!
     """)
-
-    # Ensure the current visitor is authenticated with Spotify
+    
+    # Authenticate using app.py's safer flow
     ensure_spotify_authenticated()
-
-    # Now safe to use spotify client & current_user from session_state
+    
+    # Now we have spotify_client and current_user in session_state
     sp = st.session_state["spotify_client"]
     current_user = st.session_state["current_user"]
-
+    
     st.sidebar.success(f"✅ Logged in as: **{current_user.get('display_name', current_user.get('id','Unknown'))}**")
-
-    # ==================== INPUT SECTION ====================
-
-    col1, col2 = st.columns(2)
-
-    with col1:
+    
+    # ==================== TOP LAYOUT: PARTY SETUP (LEFT) & FILTERS/SETTINGS (RIGHT) ====================
+    top_left, top_right = st.columns(2)
+    
+    # ---------- LEFT: PARTY SETUP ----------
+    with top_left:
         st.subheader("Guest List")
         guest_input = st.text_area(
             "Spotify usernames (one per line)",
@@ -539,314 +734,476 @@ def main():
             height=150,
             key="guest_input"
         )
-        guests = [g.strip() for g in guest_input.split('\n') if g.strip()]
-
+        
+        # Parse and deduplicate guests
+        raw_guests = [g.strip() for g in guest_input.split('\n') if g.strip()]
+        guests = []
+        seen = set()
+        duplicates = []
+        
+        for guest in raw_guests:
+            guest_lower = guest.lower()
+            if guest_lower in seen:
+                duplicates.append(guest)
+            else:
+                seen.add(guest_lower)
+                guests.append(guest)
+        
+        if duplicates:
+            st.warning(f"⚠️ Duplicate usernames removed: {', '.join(duplicates)}")
+        
         if guests:
             st.info(f"👥 {len(guests)} guest(s) added")
-
+            
             # Real-time validation
             if st.button("✓ Validate Usernames", key="validate_btn"):
                 with st.spinner("Validating usernames..."):
                     validated_guests = {}
                     for guest in guests:
                         exists, user_data = validate_user_exists(sp, guest)
-                        validated_guests[guest] = exists
+                        validated_guests[guest] = {
+                            'exists': exists,
+                            'data': user_data
+                        }
                     st.session_state.validated_guests = validated_guests
-
-            # Show validation status
+            
+            # Show validation status with profile pictures
             if 'validated_guests' in st.session_state:
                 st.markdown("**Validation Status:**")
                 for guest in guests:
                     if guest in st.session_state.validated_guests:
-                        if st.session_state.validated_guests[guest]:
-                            st.markdown(f"✅ {guest}")
+                        validation_info = st.session_state.validated_guests[guest]
+                        if validation_info['exists']:
+                            user_data = validation_info['data']
+                            profile_image = user_data.get('images', [{}])[0].get('url', '') if user_data.get('images') else ''
+                            
+                            col_img, col_text = st.columns([1, 9])
+                            with col_img:
+                                if profile_image:
+                                    st.image(profile_image, width=40)
+                                else:
+                                    st.write("👤")
+                            with col_text:
+                                display_name = user_data.get('display_name', guest)
+                                st.markdown(f"✅ **{display_name}** (@{guest})")
                         else:
                             st.markdown(f"❌ {guest} - Not found")
                     else:
                         st.markdown(f"⚪ {guest} - Not validated yet")
-
-    with col2:
-        st.subheader("Playlist Settings")
-        playlist_name = st.text_input("Playlist name", "Vibescape Playlist")
-        num_tracks = st.number_input("Number of tracks", min_value=10, max_value=200, value=40)
-        allocation_mode = st.radio("Allocation mode", ["Equal", "Focus"])
-
-        if allocation_mode == "Focus":
-            st.info("⚙️ Set weights below after validating guests")
-
-    st.header("2️⃣ Filters")
-
-    # Genre selection - only show if data is gathered
-    if st.session_state.get('validation_complete', False) and 'all_tracks' in st.session_state:
-        all_genres = get_all_genres_from_tracks(st.session_state.all_tracks)
-        total_tracks_found = len(st.session_state.all_tracks)
-        guest_list = ", ".join(st.session_state.guests)
-
-        if all_genres:
-            st.info(f"🎵 Found **{len(all_genres)} unique genres** and **{total_tracks_found} tracks** from: {guest_list}")
-
-    col3, col4, col5 = st.columns(3)
-
-    with col3:
-        # Genre multiselect dropdown - populated after data gathering
+        
+        st.markdown("---")
+        if guests and st.button("🔍 Scan Playlists and Gather Music Taste", type="primary", key="gather_data_btn"):
+            if not guests:
+                st.error("Please add at least one guest!")
+                st.stop()
+            
+            st.session_state.validation_complete = False
+            st.session_state.all_tracks = []
+            
+            with st.spinner("🔎 We're analyzing you and your friends' music taste — fetching playlists, scanning tracks, and identifying genres. Depending on the number of friends on the guest list and the amount of tracks they have in public playlists, this may take a few minutes. Grab a drink and relax while we work our magic! ☕🎵"):
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                all_tracks = []
+                invalid_users = []
+                users_no_playlists = []
+                
+                for idx, guest in enumerate(guests):
+                    status_text.text(f"Processing {guest}...")
+                    
+                    # Validate user exists
+                    exists, user_data = validate_user_exists(sp, guest)
+                    if not exists:
+                        invalid_users.append(guest)
+                        progress_bar.progress((idx + 1) / len(guests))
+                        continue
+                    
+                    # Get user's playlist data
+                    user_market = current_user.get('country', 'US')
+                    tracks = get_user_playlists_data(sp, guest, user_market)
+                    
+                    if not tracks:
+                        users_no_playlists.append(guest)
+                    else:
+                        # Get all unique artist IDs
+                        artist_ids = set()
+                        for track in tracks:
+                            artist_ids.update(track['artist_ids'])
+                        
+                        # Fetch genres for all artists
+                        genres_map = get_artist_genres(sp, list(artist_ids))
+                        
+                        # Add genres to tracks
+                        for track in tracks:
+                            track_genres = []
+                            for artist_id in track['artist_ids']:
+                                track_genres.extend(genres_map.get(artist_id, []))
+                            track['genres'] = list(set(track_genres))
+                        
+                        all_tracks.extend(tracks)
+                    
+                    progress_bar.progress((idx + 1) / len(guests))
+                
+                status_text.empty()
+                progress_bar.empty()
+                
+                # Check for invalid users
+                if invalid_users:
+                    st.error(f"❌ The following Spotify usernames do not exist: {', '.join(invalid_users)}")
+                    st.error("Please correct the usernames and try again.")
+                    st.stop()
+                
+                # Warn about users with no playlists
+                if users_no_playlists:
+                    st.warning(f"⚠️ No public playlists found for: {', '.join(users_no_playlists)}")
+                    st.info("💡 **Note:** Users without public playlists cannot contribute their music taste to the playlist creation. Please ask them to make some playlists public temporarily.")
+                
+                if not all_tracks:
+                    st.error("No tracks found across all guests. Please check that guests have public playlists.")
+                    st.stop()
+                
+                st.session_state.all_tracks = all_tracks
+                st.session_state.guests = guests
+                st.session_state.validation_complete = True
+                
+                st.success(f"✅ Successfully gathered {len(all_tracks)} tracks from {len(guests)} guests!")
+                st.rerun()  # Force UI refresh to show genre selector
+    
+    # ---------- RIGHT: FILTERS & SETTINGS ----------
+    with top_right:
+        st.header("Filters & Settings")
+        
+        # Defaults for later analytics (in case user hasn't generated yet)
+        selected_genres = []
+        year_range = None
+        popularity_range = (0, 100)
+        max_per_artist = 5
+        
+        # Genre selection - only show if data is gathered
         if st.session_state.get('validation_complete', False) and 'all_tracks' in st.session_state:
             all_genres = get_all_genres_from_tracks(st.session_state.all_tracks)
-
+            total_tracks_found = len(st.session_state.all_tracks)
+            guest_list = ", ".join(st.session_state.guests)
+            
             if all_genres:
-                selected_genres = st.multiselect(
-                    "Select genres",
-                    options=all_genres,
-                    help="Select one or multiple genres from your guests' music. Leave empty to include all genres."
-                )
-                # Already lowercase from Spotify
-            else:
-                st.warning("No genres found in guests' playlists")
-                selected_genres = []
-        else:
-            st.info("👆 Validate guests first to see available genres")
-            selected_genres = []
-
-    with col4:
-        year_filter = st.checkbox("Filter by year", value=False)
-        if year_filter:
-            year_range = st.slider("Release year range", 1960, 2025, (2018, 2025))
-        else:
-            year_range = None
-
-    with col5:
-        popularity_options = {
-            "All (0-100)": (0, 100),
-            "Underground (0-33)": (0, 33),
-            "Midrange (34-66)": (34, 66),
-            "Mainstream (67-100)": (67, 100)
-        }
-        popularity_choice = st.selectbox("Popularity range", list(popularity_options.keys()))
-        popularity_range = popularity_options[popularity_choice]
-
-    market_filter = st.checkbox("Filter by market availability", value=True)
-    max_per_artist = st.number_input("Max tracks per artist", min_value=1, max_value=20, value=5)
-
-    # ==================== VALIDATION & DATA GATHERING ====================
-
-    if st.button("🔍 Validate Guests & Gather Data", type="primary"):
-        if not guests:
-            st.error("Please add at least one guest!")
-            st.stop()
-
-        st.session_state.validation_complete = False
-        st.session_state.all_tracks = []
-
-        with st.spinner("🔎 We're analyzing you and your friends' music taste — fetching playlists, scanning tracks, and identifying genres. This may take 2–3 minutes. Grab a drink and relax while we work our magic! ☕🎵"):
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-
-            all_tracks = []
-            invalid_users = []
-            users_no_playlists = []
-
-            for idx, guest in enumerate(guests):
-                status_text.text(f"Processing {guest}...")
-
-                # Validate user exists
-                exists, user_data = validate_user_exists(sp, guest)
-                if not exists:
-                    invalid_users.append(guest)
-                    progress_bar.progress((idx + 1) / len(guests))
-                    continue
-
-                # Get user's playlist data
-                user_market = current_user.get('country', 'US')
-                tracks = get_user_playlists_data(sp, guest, user_market)
-
-                if not tracks:
-                    users_no_playlists.append(guest)
+                st.info(f"🎵 Found **{len(all_genres)} unique genres** and **{total_tracks_found} tracks** from: {guest_list}")
+        
+        col3, col4 = st.columns([2, 1])
+        
+        with col3:
+            # Genre multiselect dropdown - populated after data gathering
+            if st.session_state.get('validation_complete', False) and 'all_tracks' in st.session_state:
+                all_genres = get_all_genres_from_tracks(st.session_state.all_tracks)
+                
+                if all_genres:
+                    # Get genre recommendations
+                    consensus, discovery, discovery_message = get_genre_recommendations(
+                        st.session_state.all_tracks, 
+                        st.session_state.guests
+                    )
+                    
+                    # Display Consensus Genres
+                    if consensus:
+                        st.markdown("**🎯 Consensus Top 5 Genres**")
+                        for idx, item in enumerate(consensus, 1):
+                            genre = item[0]
+                            num_users = item[1]
+                            st.markdown(f"{idx}. **{genre}** ({num_users} users)")
+                        st.markdown("---")
+                    
+                    # Display Discovery Genres - always show the section for 2+ users
+                    if len(st.session_state.guests) >= 2:
+                        st.markdown("**🔍 Discovery Genres**")
+                        if discovery:
+                            for idx, item in enumerate(discovery, 1):
+                                genre = item[0]
+                                users = item[1]
+                                user_list = ", ".join(users)
+                                st.markdown(f"{idx}. **{genre}** (from {user_list})")
+                        elif discovery_message:
+                            st.info(discovery_message)
+                        st.markdown("---")
+                    
+                    selected_genres = st.multiselect(
+                        "Select genres for your playlist",
+                        options=all_genres,
+                        help="Select one or multiple genres from your guests' music. Leave empty to include all genres."
+                    )
                 else:
-                    # Get all unique artist IDs
-                    artist_ids = set()
-                    for track in tracks:
-                        artist_ids.update(track['artist_ids'])
-
-                    # Fetch genres for all artists
-                    genres_map = get_artist_genres(sp, list(artist_ids))
-
-                    # Add genres to tracks
-                    for track in tracks:
-                        track_genres = []
-                        for artist_id in track['artist_ids']:
-                            track_genres.extend(genres_map.get(artist_id, []))
-                        track['genres'] = list(set(track_genres))
-
-                    all_tracks.extend(tracks)
-
-                progress_bar.progress((idx + 1) / len(guests))
-
-            status_text.empty()
-            progress_bar.empty()
-
-            # Check for invalid users
-            if invalid_users:
-                st.error(f"❌ The following Spotify usernames do not exist: {', '.join(invalid_users)}")
-                st.error("Please correct the usernames and try again.")
-                st.stop()
-
-            # Warn about users with no playlists
-            if users_no_playlists:
-                st.warning(f"⚠️ No public playlists found for: {', '.join(users_no_playlists)}")
-
-            if not all_tracks:
-                st.error("No tracks found across all guests. Please check that guests have public playlists.")
-                st.stop()
-
-            st.session_state.all_tracks = all_tracks
-            st.session_state.guests = guests
-            st.session_state.validation_complete = True
-
-            st.success(f"✅ Successfully gathered {len(all_tracks)} tracks from {len(guests)} guests!")
-            st.rerun()  # Force UI refresh to show genre selector
-
-    # ==================== FOCUS MODE WEIGHTS ====================
-    if allocation_mode == "Focus" and st.session_state.get('validation_complete', False):
-        st.subheader("Focus Mode: Weight Distribution")
-        st.info("Adjust how much each guest's music taste influences the playlist. Total must equal 100%.")
-
-        # Initialize weights if not exist or if guest list changed
-        if 'user_weight_values' not in st.session_state or set(st.session_state.user_weight_values.keys()) != set(st.session_state.guests):
-            equal_weight = (100 // len(st.session_state.guests) // 10) * 10  # Round to nearest 10
-            st.session_state.user_weight_values = {guest: equal_weight for guest in st.session_state.guests}
-            # Adjust last one to make exactly 100
-            remaining = 100 - (equal_weight * (len(st.session_state.guests) - 1))
-            st.session_state.user_weight_values[st.session_state.guests[-1]] = remaining
-
-        weights = {}
-        total_weight = 0
-
-        for idx, guest in enumerate(st.session_state.guests):
-            # Use existing value if available, otherwise use default
-            default_value = st.session_state.user_weight_values.get(guest, 0)
-            weight = st.slider(
-                f"{guest}",
-                0,
-                100,
-                default_value,
-                step=10,  # 10% increments
-                key=f"weight_{guest}"
-            )
-            st.session_state.user_weight_values[guest] = weight
-            weights[guest] = weight / 100.0
-            total_weight += weight
-
-        # Show total and warning if not 100%
-        if total_weight == 100:
-            st.success(f"✅ Total weight: {total_weight}%")
+                    st.warning("No genres found in guests' playlists")
+                    selected_genres = []
+            else:
+                st.info("👆 Validate guests first to see available genres")
+                selected_genres = []
+        
+        with col4:
+            st.markdown("**Playlist Settings**")
+            playlist_name = st.text_input("Playlist name", "Vibescape Playlist", label_visibility="collapsed")
+            num_tracks = st.number_input("Number of tracks", min_value=10, max_value=200, value=40)
+            allocation_mode = st.radio("Allocation mode", ["Equal", "Focus"])
+            
+            if allocation_mode == "Focus":
+                st.info("⚙️ Set weights below")
+        
+        st.markdown("---")
+        
+        col5, col6, col7 = st.columns(3)
+        with col5:
+            year_filter = st.checkbox("Filter by year", value=False)
+            if year_filter:
+                year_range = st.slider("Release year range", 1960, 2025, (2018, 2025))
+            else:
+                year_range = None
+        
+        with col6:
+            popularity_options = {
+                "All (0-100)": (0, 100),
+                "Underground (0-33)": (0, 33),
+                "Midrange (34-66)": (34, 66),
+                "Mainstream (67-100)": (67, 100)
+            }
+            popularity_choice = st.selectbox("Popularity range", list(popularity_options.keys()))
+            popularity_range = popularity_options[popularity_choice]
+        
+        with col7:
+            max_per_artist = st.number_input("Max tracks per artist", min_value=1, max_value=20, value=5)
+        
+        # ==================== FOCUS MODE WEIGHTS ====================
+        if allocation_mode == "Focus" and st.session_state.get('validation_complete', False):
+            st.subheader("Focus Mode: Weight Distribution")
+            st.info("Adjust how much each guest's music taste influences the playlist. Total must equal 100%.")
+            
+            # Initialize weights if not exist or if guest list changed
+            if 'user_weight_values' not in st.session_state or set(st.session_state.user_weight_values.keys()) != set(st.session_state.guests):
+                equal_weight = (100 // len(st.session_state.guests) // 10) * 10  # Round to nearest 10
+                st.session_state.user_weight_values = {guest: equal_weight for guest in st.session_state.guests}
+                # Adjust last one to make exactly 100
+                remaining = 100 - (equal_weight * (len(st.session_state.guests) - 1))
+                st.session_state.user_weight_values[st.session_state.guests[-1]] = remaining
+            
+            weights = {}
+            total_weight = 0
+            
+            for idx, guest in enumerate(st.session_state.guests):
+                # Use existing value if available, otherwise use default
+                default_value = st.session_state.user_weight_values.get(guest, 0)
+                weight = st.slider(
+                    f"{guest}", 
+                    0, 
+                    100, 
+                    default_value,
+                    step=10,  # 10% increments
+                    key=f"weight_{guest}"
+                )
+                st.session_state.user_weight_values[guest] = weight
+                weights[guest] = weight / 100.0
+                total_weight += weight
+            
+            # Show total and warning if not 100%
+            if total_weight == 100:
+                st.success(f"✅ Total weight: {total_weight}%")
+            else:
+                st.error(f"⚠️ Total weight: {total_weight}% - Must equal 100% to generate playlist!")
+            
+            st.session_state.user_weights = weights
+            st.session_state.weights_valid = (total_weight == 100)
         else:
-            st.error(f"⚠️ Total weight: {total_weight}% - Must equal 100% to generate playlist!")
-
-        st.session_state.user_weights = weights
-        st.session_state.weights_valid = (total_weight == 100)
-
-    # ==================== PLAYLIST GENERATION ====================
-    if st.session_state.get('validation_complete', False):
-        # Check if Focus mode weights are valid
-        can_generate = True
-        if allocation_mode == "Focus":
-            if not st.session_state.get('weights_valid', False):
-                can_generate = False
-                st.warning("⚠️ Please adjust weights to total 100% before generating playlist")
-
-        if can_generate and st.button("🎨 Generate Playlist", type="primary"):
-            all_tracks = st.session_state.all_tracks
-
-            with st.spinner("Filtering and ranking tracks..."):
-                # Apply filters
-                user_market = current_user.get('country', 'US')
-                filtered_tracks = filter_tracks(
-                    all_tracks,
-                    selected_genres,
-                    year_range,
-                    popularity_range,
-                    user_market,
-                    market_filter,
-                    max_per_artist
-                )
-
-                if not filtered_tracks:
-                    st.error("❌ No tracks match your filter criteria.")
-                    st.info("💡 Try: widening the year range, selecting different genres, or changing the popularity range")
-                    st.stop()
-
-                # Calculate scores
-                scored_tracks = calculate_track_scores(filtered_tracks)
-
-                # Allocate tracks
-                user_weights = st.session_state.get('user_weights', None) if allocation_mode == "Focus" else None
-                selected_tracks, allocation_info = allocate_tracks(
-                    scored_tracks,
-                    allocation_mode,
-                    num_tracks,
-                    user_weights
-                )
-
-                st.session_state.selected_tracks = selected_tracks
-                st.session_state.filtered_tracks = filtered_tracks
-                st.session_state.allocation_info = allocation_info
-
-                # Get top consensus tracks
-                selected_ids = {t['id'] for t in selected_tracks}
-                top_consensus = get_top_consensus_tracks(scored_tracks, selected_ids)
-                st.session_state.top_consensus = top_consensus
-
-            st.success("✅ Playlist generated successfully!")
-
-    # ==================== ANALYTICS & PREVIEW ====================
+            st.session_state.weights_valid = True  # for Equal mode
+        
+        # ==================== PLAYLIST GENERATION BUTTON ====================
+        if st.session_state.get('validation_complete', False):
+            # Check if Focus mode weights are valid
+            can_generate = True
+            if allocation_mode == "Focus":
+                if not st.session_state.get('weights_valid', False):
+                    can_generate = False
+                    st.warning("⚠️ Please adjust weights to total 100% before generating playlist")
+            
+            if can_generate and st.button("🎨 Generate Playlist", type="primary"):
+                all_tracks = st.session_state.all_tracks
+                
+                with st.spinner("Filtering and ranking tracks..."):
+                    # Apply filters (market filter always enabled)
+                    user_market = current_user.get('country', 'US')
+                    filtered_tracks = filter_tracks(
+                        all_tracks,
+                        selected_genres,
+                        year_range,
+                        popularity_range,
+                        user_market,
+                        True,  # market filter always enabled to match v10 behavior
+                        max_per_artist
+                    )
+                    
+                    if not filtered_tracks:
+                        st.error("❌ No tracks match your filter criteria.")
+                        st.info("💡 Try: widening the year range, selecting different genres, or changing the popularity range")
+                        st.stop()
+                    
+                    # Calculate scores
+                    scored_tracks = calculate_track_scores(filtered_tracks)
+                    
+                    # Allocate tracks
+                    user_weights = st.session_state.get('user_weights', None) if allocation_mode == "Focus" else None
+                    selected_tracks, allocation_info = allocate_tracks(
+                        scored_tracks,
+                        allocation_mode,
+                        num_tracks,
+                        user_weights
+                    )
+                    
+                    st.session_state.selected_tracks = selected_tracks
+                    st.session_state.filtered_tracks = filtered_tracks
+                    st.session_state.allocation_info = allocation_info
+                    
+                    # Initialize tracks_to_remove if not exists
+                    if 'tracks_to_remove' not in st.session_state:
+                        st.session_state.tracks_to_remove = set()
+                    
+                    # Get top consensus tracks
+                    selected_ids = {t['id'] for t in selected_tracks}
+                    top_consensus = get_top_consensus_tracks(scored_tracks, selected_ids)
+                    st.session_state.top_consensus = top_consensus
+                
+                st.success("✅ Playlist generated successfully!")
+    
+    # ==================== SUMMARY ANALYTICS (SINGLE COLUMN) ====================
     if 'selected_tracks' in st.session_state:
-        st.header("3️⃣ Playlist Preview")
-
+        st.markdown("---")
+        st.header("📊 Summary Analytics")
+        
         selected_tracks = st.session_state.selected_tracks
         filtered_tracks = st.session_state.filtered_tracks
         all_tracks = st.session_state.all_tracks
         allocation_info = st.session_state.get('allocation_info', {})
-
-        # Summary analytics
-        st.markdown("### 📊 Summary Analytics")
-
+        
         genre_display = ", ".join(selected_genres) if selected_genres else "All"
         pop_display = f"{popularity_range[0]}–{popularity_range[1]}"
         year_display = f"{year_range[0]}–{year_range[1]}" if year_range else "All"
-
-        metrics_col1, metrics_col2, metrics_col3, metrics_col4 = st.columns(4)
+        
+        # LEFT: Track Contribution + Save/Refill Buttons
+        metrics_col1, metrics_col2, metrics_col3, metrics_col4, metrics_col5 = st.columns([2, 1.5, 1.5, 1.5, 1.5])
+        
         with metrics_col1:
+            st.markdown("**Track Contribution by Guest**")
+            if 'user_contribution' in allocation_info and allocation_info['user_contribution']:
+                for user, count in allocation_info['user_contribution'].items():
+                    percentage = (count / len(selected_tracks) * 100) if selected_tracks else 0
+                    st.markdown(f"**{user}**  \n{count} tracks • {percentage:.1f}%")
+            else:
+                st.markdown("No track contributions available.")
+            
+            st.markdown("---")
+            
+            # Save to Spotify section
+            make_public = st.checkbox("Make playlist public", value=False)
+            
+            col_save, col_refill = st.columns(2)
+            
+            with col_save:
+                if st.button("💾 Save Playlist to Spotify", type="primary", key="save_playlist_btn"):
+                    final_tracks = [t for t in st.session_state.selected_tracks if t['id'] not in st.session_state.get('tracks_to_remove', set())]
+                    
+                    if not final_tracks:
+                        st.error("No tracks to save!")
+                    else:
+                        with st.spinner("Creating playlist on Spotify..."):
+                            try:
+                                # Create playlist
+                                playlist = sp.user_playlist_create(
+                                    user=current_user['id'],
+                                    name=playlist_name,
+                                    public=make_public
+                                )
+                                
+                                # Add tracks in batches of 100
+                                track_uris = [f"spotify:track:{t['id']}" for t in final_tracks]
+                                skipped = []
+                                
+                                for i in range(0, len(track_uris), 100):
+                                    batch = track_uris[i:i+100]
+                                    try:
+                                        sp.playlist_add_items(playlist['id'], batch)
+                                    except Exception as e:
+                                        skipped.extend(batch)
+                                
+                                st.success(f"🎉 Playlist '{playlist_name}' created successfully!")
+                                try:
+                                    st.markdown(f"[Open in Spotify]({playlist['external_urls']['spotify']})")
+                                except Exception:
+                                    pass
+                                
+                                if skipped:
+                                    st.warning(f"⚠️ {len(skipped)} tracks were unavailable and skipped")
+                            
+                            except Exception as e:
+                                st.error(f"Error creating playlist: {str(e)}")
+            
+            with col_refill:
+                # Refill button - always show if tracks_to_remove exists and has items
+                if st.session_state.get('tracks_to_remove'):
+                    if st.button("🔄 Refill Removed Slots", key="refill_slots_btn"):
+                        # Get IDs that should never be added back
+                        permanently_removed = st.session_state.tracks_to_remove.copy()
+                        
+                        # Get current selected track IDs (including removed ones)
+                        all_selected_ids = {t['id'] for t in selected_tracks}
+                        
+                        # Get remaining tracks that haven't been selected AND haven't been removed
+                        remaining_tracks = [
+                            t for t in filtered_tracks 
+                            if t['id'] not in all_selected_ids and t['id'] not in permanently_removed
+                        ]
+                        remaining_tracks.sort(
+                            key=lambda t: (t['score']['cross_user_dup_count'], 
+                                          t['score']['popularity'], 
+                                          t['score']['release_year']),
+                            reverse=True
+                        )
+                        
+                        # Refill
+                        num_to_add = len(st.session_state.tracks_to_remove)
+                        new_tracks = remaining_tracks[:num_to_add]
+                        
+                        # Update selected tracks - keep non-removed tracks and add new ones
+                        kept_tracks = [t for t in selected_tracks if t['id'] not in st.session_state.tracks_to_remove]
+                        st.session_state.selected_tracks = kept_tracks + new_tracks
+                        
+                        # Clear tracks_to_remove since we've refilled
+                        st.session_state.tracks_to_remove = set()
+                        
+                        # Regenerate display order
+                        if 'display_order' in st.session_state:
+                            del st.session_state.display_order
+                        
+                        st.rerun()
+        
+        with metrics_col2:
             st.metric("Friends", len(st.session_state.guests))
             st.metric("Selected Genres", genre_display)
-        with metrics_col2:
+        
+        with metrics_col3:
             st.metric("Popularity", pop_display)
             st.metric("Time Range", year_display)
-        with metrics_col3:
+        
+        with metrics_col4:
             st.metric("Total Candidates", len(all_tracks))
             st.metric("After Filters", len(filtered_tracks))
-        with metrics_col4:
+        
+        with metrics_col5:
             st.metric("Chosen", len(selected_tracks))
             shortfall = num_tracks - len(selected_tracks)
             st.metric("Shortfall", shortfall, delta="Need more tracks" if shortfall > 0 else "Complete")
-
-        # User contribution breakdown
-        if 'user_contribution' in allocation_info:
-            st.markdown("### 👥 Track Contribution by Guest")
-            contrib_cols = st.columns(len(allocation_info['user_contribution']))
-            for idx, (user, count) in enumerate(allocation_info['user_contribution'].items()):
-                with contrib_cols[idx]:
-                    percentage = (count / len(selected_tracks) * 100) if selected_tracks else 0
-                    st.metric(user, f"{count} tracks", f"{percentage:.1f}%")
-
+        
         # Show allocation warnings
         if allocation_info.get('warnings'):
             st.warning("⚠️ **Allocation Notices:**")
             for warning in allocation_info['warnings']:
                 st.markdown(f"- {warning}")
             st.info("💡 Remaining slots were filled with the best-ranked tracks from users who had available songs.")
-
-        # Track preview
+        
+        # Track preview + remove / refill logic (same as v10)
         st.markdown("### 🎵 Track List")
-
         if 'tracks_to_remove' not in st.session_state:
             st.session_state.tracks_to_remove = set()
 
@@ -857,13 +1214,13 @@ def main():
             col_track, col_button = st.columns([5, 1])
 
             with col_track:
-                genres_display = ", ".join(track['genres'][:3]) if track['genres'] else "No genre"
-                year = parse_release_year(track['album_release_date'])
-                artists_display = ', '.join([a for a in track['artists'] if a]) or "Unknown Artist"
+                genres_display = ", ".join(track.get('genres', [])[:3]) if track.get('genres') else "No genre"
+                year = parse_release_year(track.get('album_release_date', ''))
+                artists_display = ', '.join([a for a in track.get('artists', []) if a]) or "Unknown Artist"
 
                 st.markdown(f"""
-                **{idx + 1}. {track['name']}** by {artists_display}  
-                `Friend: {track['user_id']}` • `Popularity: {track['popularity']}` • `Year: {year}` • `Genres: {genres_display}`
+                **{idx + 1}. {track.get('name','Unknown')}** by {artists_display}  
+                `Friend: {track.get('user_id','Unknown')}` • `Popularity: {track.get('popularity',0)}` • `Year: {year}` • `Genres: {genres_display}`
                 """)
 
             with col_button:
@@ -876,7 +1233,7 @@ def main():
             if st.button("🔄 Refill Removed Slots"):
                 # Get remaining tracks
                 selected_ids = {t['id'] for t in selected_tracks if t['id'] not in st.session_state.tracks_to_remove}
-                remaining_tracks = [t for t in filtered_tracks if t['id'] not in selected_ids]
+                remaining_tracks = [t for t in filtered_tracks if t['id'] not in selected_ids and t['id'] not in st.session_state.tracks_to_remove]
                 remaining_tracks.sort(
                     key=lambda t: (t['score']['cross_user_dup_count'],
                                   t['score']['popularity'],
@@ -894,73 +1251,11 @@ def main():
                 st.session_state.tracks_to_remove = set()
                 st.rerun()
 
-        # Top consensus tracks
+        # Top consensus tracks (optional display)
         if st.session_state.get('top_consensus'):
-            st.markdown("### ⭐ Top Genre Songs (Not in Playlist)")
-            st.info("High-consensus tracks that didn't make it into the playlist")
-
-            for track in st.session_state.top_consensus:
-                col_consensus, col_add = st.columns([5, 1])
-
-                with col_consensus:
-                    genres_display = ", ".join(track['genres'][:3]) if track['genres'] else "No genre"
-                    year = parse_release_year(track['album_release_date'])
-                    artists_display = ', '.join([a for a in track['artists'] if a]) or "Unknown Artist"
-
-                    st.markdown(f"""
-                    **{track['name']}** by {artists_display}  
-                    `Consensus: {track['score']['cross_user_dup_count']} users` • `Popularity: {track['popularity']}` • `Year: {year}`
-                    """)
-
-                with col_add:
-                    if st.button("➕", key=f"add_{track['id']}"):
-                        st.session_state.selected_tracks.append(track)
-                        st.rerun()
-
-    # ==================== CREATE PLAYLIST ====================
-    if 'selected_tracks' in st.session_state:
-        st.header("4️⃣ Create Playlist")
-
-        make_public = st.checkbox("Make playlist public", value=False)
-
-        if st.button("💾 Save to Spotify", type="primary"):
-            final_tracks = [t for t in st.session_state.selected_tracks if t['id'] not in st.session_state.tracks_to_remove]
-
-            if not final_tracks:
-                st.error("No tracks to save!")
-                st.stop()
-
-            with st.spinner("Creating playlist on Spotify..."):
-                try:
-                    # Create playlist under the currently authenticated user
-                    sp = st.session_state["spotify_client"]
-                    current_user = st.session_state["current_user"]
-
-                    playlist = sp.user_playlist_create(
-                        user=current_user['id'],
-                        name=playlist_name,
-                        public=make_public
-                    )
-
-                    # Add tracks in batches of 100
-                    track_uris = [f"spotify:track:{t['id']}" for t in final_tracks]
-                    skipped = []
-
-                    for i in range(0, len(track_uris), 100):
-                        batch = track_uris[i:i+100]
-                        try:
-                            sp.playlist_add_items(playlist['id'], batch)
-                        except Exception as e:
-                            skipped.extend(batch)
-
-                    st.success(f"🎉 Playlist '{playlist_name}' created successfully!")
-                    st.markdown(f"[Open in Spotify]({playlist['external_urls']['spotify']})")
-
-                    if skipped:
-                        st.warning(f"⚠️ {len(skipped)} tracks were unavailable and skipped")
-
-                except Exception as e:
-                    st.error(f"Error creating playlist: {str(e)}")
+            st.markdown("### 🔁 Top Consensus Tracks (not in playlist)")
+            for t in st.session_state.top_consensus:
+                st.markdown(f"- {t.get('name','Unknown')} by {', '.join(t.get('artists',[]))} (pop: {t.get('popularity',0)})")
 
 if __name__ == "__main__":
     main()
