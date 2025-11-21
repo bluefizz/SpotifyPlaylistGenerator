@@ -785,9 +785,7 @@ def main():
     sp = st.session_state["spotify_client"]
     current_user = st.session_state["current_user"]
 
-    # DEBUG: Show Spotify profile JSON
-    st.subheader("Debug Profile Data")
-    st.json(current_user)
+  
 
     st.sidebar.success(f"✅ Logged in as: **{current_user.get('display_name', current_user.get('id','Unknown'))}**")
 
@@ -1193,7 +1191,7 @@ def main():
             st.markdown("---")
 
             # ✅ checkbox: default = private
-            make_public = st.checkbox("Make playlist public", value=False, key="make_public")
+            make_public = make_public = st.checkbox("Make playlist public", value=False, key=f"make_public_{time.time()}")
 
             col_save, col_refill = st.columns(2)
 
@@ -1215,6 +1213,7 @@ def main():
                                     name=playlist_name,
                                     public=False  # always start as private
                                 )
+                                
 
                                 # If user checked "Make playlist public" → flip to public
                                 if make_public:
