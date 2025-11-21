@@ -1,6 +1,6 @@
 # app_merged_v11.py
 # Merged: v11 features/UI + app.py multi-user-safe authentication (single file, Option A)
-# Sources: v11.py and app.py. See file citations in chat. :contentReference[oaicite:2]{index=2} :contentReference[oaicite:3]{index=3}
+# Sources: v11.py and app.py. See file citations in chat.
 
 import streamlit as st
 import spotipy
@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 import random
 import math
 import glob
+import base64  # <- added for cover upload
 
 # Load environment variables (for local dev; on Streamlit Cloud use st.secrets)
 load_dotenv()
@@ -1013,6 +1014,13 @@ def main():
         with col4:
             st.markdown("**Playlist Settings**")
             playlist_name = st.text_input("Playlist name", "Vibescape Playlist", label_visibility="collapsed")
+
+            # ✅ ADDED: optional playlist cover uploader
+            playlist_image = st.file_uploader(
+                "Upload playlist cover (optional, JPG only)",
+                type=["jpg", "jpeg"]
+            )
+
             num_tracks = st.number_input("Number of tracks", min_value=10, max_value=200, value=40)
             allocation_mode = st.radio("Allocation mode", ["Equal", "Focus"])
 
@@ -1149,6 +1157,7 @@ def main():
         allocation_info = st.session_state.get('allocation_info', {})
         genre_contribution = st.session_state.get('genre_contribution', {})
 
+        # Note: selected_genres, popularity_range, year_range come from above scope
         genre_display = ", ".join(selected_genres) if selected_genres else "All"
         pop_display = f"{popularity_range[0]}–{popularity_range[1]}"
         year_display = f"{year_range[0]}–{year_range[1]}" if year_range else "All"
@@ -1194,6 +1203,19 @@ def main():
                                         sp.playlist_add_items(playlist['id'], batch)
                                     except Exception as e:
                                         skipped.extend(batch)
+
+                                # ✅ NEW: upload playlist cover if user uploaded an image
+                                if playlist_image is not None:
+                                    try:
+                                        # Use getvalue() so we can safely read the bytes
+                                        image_bytes = playlist_image.getvalue()
+                                        encoded_image = base64.b64encode(image_bytes).decode("utf-8")
+                                        sp.playlist_upload_cover_image(playlist['id'], encoded_image)
+                                        st.success("🖼️ Custom playlist cover uploaded!")
+                                    except Exception as e:
+                                        st.error(f"Failed to upload playlist cover: {e}")
+                                else:
+                                    st.info("No cover image uploaded → Spotify will generate the default one.")
 
                                 st.success(f"🎉 Playlist '{playlist_name}' created successfully!")
                                 try:
