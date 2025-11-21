@@ -189,10 +189,10 @@ def validate_user_exists(sp, username):
     try:
         user = sp.user(username)
         return True, user
-    except Exception:
+    except Exception as e:
         return False, None
 
-def get_user_playlists_data(sp, username):
+def get_user_playlists_data(sp, username, market):
     """Gather all tracks from user's public playlists with metadata"""
     # Check cache first
     cached_data = get_cached_playlists(username)
@@ -246,7 +246,7 @@ def get_user_playlists_data(sp, username):
                     'explicit': track.get('explicit', False),
                     'album_release_date': track['album'].get('release_date', ''),
                     'url': track['external_urls'].get('spotify', ''),
-                    #'available_markets': track.get('available_markets', []),
+                    'available_markets': track.get('available_markets', []),
                     'user_id': username,
                     'playlist_name': playlist.get('name', '')
                 }
@@ -307,19 +307,18 @@ def parse_release_year(release_date):
     except:
         return None
 
-def filter_tracks(tracks, selected_genres, year_range, popularity_range,
-                   max_per_artist):
+def filter_tracks(tracks, selected_genres, year_range, popularity_range, market, market_filter_enabled, max_per_artist):
     """Apply all filters to tracks"""
     filtered = []
     artist_count = defaultdict(int)
 
     for track in tracks:
-        # Genre filter
+        # Genre filter - if multiple genres selected, ensure equal distribution
         track_genres = track.get('genres', [])
         if selected_genres and not any(g in track_genres for g in selected_genres):
             continue
 
-        # Year filter
+        # Year filter - if enabled, exclude tracks with no year
         release_year = parse_release_year(track['album_release_date'])
         if year_range:
             if release_year is None:
@@ -334,9 +333,9 @@ def filter_tracks(tracks, selected_genres, year_range, popularity_range,
                 continue
 
         # Market filter (if enabled)
-        #if market_filter_enabled and market:
-            #if market not in track.get('available_markets', []):
-             #   continue
+        if market_filter_enabled and market:
+            if market not in track.get('available_markets', []):
+                continue
 
         # Max tracks per artist
         artist_key = tuple(sorted(track['artist_ids']))
@@ -385,8 +384,8 @@ def allocate_tracks(tracks, allocation_mode, num_tracks, user_weights=None, sele
     for user in user_tracks:
         user_tracks[user].sort(
             key=lambda t: (t['score']['cross_user_dup_count'],
-                           t['score']['popularity'],
-                           t['score']['release_year']),
+                          t['score']['popularity'],
+                          t['score']['release_year']),
             reverse=True
         )
 
@@ -411,8 +410,8 @@ def allocate_tracks(tracks, allocation_mode, num_tracks, user_weights=None, sele
         for genre in genre_tracks:
             genre_tracks[genre].sort(
                 key=lambda t: (t['score']['cross_user_dup_count'],
-                               t['score']['popularity'],
-                               t['score']['release_year']),
+                              t['score']['popularity'],
+                              t['score']['release_year']),
                 reverse=True
             )
 
@@ -490,9 +489,7 @@ def allocate_tracks(tracks, allocation_mode, num_tracks, user_weights=None, sele
             contributed = user_contribution[user]
             if contributed < target_per_user:
                 shortfall = target_per_user - contributed
-                allocation_warnings.append(
-                    f"**{user}** contributed only {contributed} tracks (target: {target_per_user}, shortfall: {shortfall})"
-                )
+                allocation_warnings.append(f"**{user}** contributed only {contributed} tracks (target: {target_per_user}, shortfall: {shortfall})")
 
     else:  # Focus mode
         if not user_weights:
@@ -526,9 +523,7 @@ def allocate_tracks(tracks, allocation_mode, num_tracks, user_weights=None, sele
 
             if user_selected[user] < target:
                 shortfall = target - user_selected[user]
-                allocation_warnings.append(
-                    f"**{user}** contributed only {user_selected[user]} tracks (target: {target}, shortfall: {shortfall})"
-                )
+                allocation_warnings.append(f"**{user}** contributed only {user_selected[user]} tracks (target: {target}, shortfall: {shortfall})")
 
         # Fill remaining with best available from active users
         remaining_tracks = []
@@ -539,8 +534,8 @@ def allocate_tracks(tracks, allocation_mode, num_tracks, user_weights=None, sele
 
         remaining_tracks.sort(
             key=lambda t: (t['score']['cross_user_dup_count'],
-                           t['score']['popularity'],
-                           t['score']['release_year']),
+                          t['score']['popularity'],
+                          t['score']['release_year']),
             reverse=True
         )
 
@@ -691,11 +686,7 @@ def get_genre_recommendations(all_tracks, guests):
                 if (genre, [user], count) not in discovery:
                     discovery.append((genre, [user], count))
 
-        discovery_message = (
-            "No discovery genres found - music tastes are similar."
-            if not discovery
-            else None
-        )
+        discovery_message = "No discovery genres found - music tastes are similar." if not discovery else None
 
         return consensus, discovery, discovery_message
 
@@ -752,11 +743,7 @@ def get_genre_recommendations(all_tracks, guests):
             if (genre, users_list, count) not in discovery:
                 discovery.append((genre, users_list, count))
 
-    discovery_message = (
-        "No discovery genres found - music tastes are similar."
-        if not discovery
-        else None
-    )
+    discovery_message = "No discovery genres found - music tastes are similar." if not discovery else None
 
     return consensus, discovery, discovery_message
 
@@ -784,8 +771,6 @@ def main():
     # After authenticate returns, spotify_client and current_user are available
     sp = st.session_state["spotify_client"]
     current_user = st.session_state["current_user"]
-
-  
 
     st.sidebar.success(f"✅ Logged in as: **{current_user.get('display_name', current_user.get('id','Unknown'))}**")
 
@@ -1030,7 +1015,7 @@ def main():
             st.markdown("**Playlist Settings**")
             playlist_name = st.text_input("Playlist name", "Vibescape Playlist", label_visibility="collapsed")
 
-            # ✅ optional playlist cover uploader
+            # ✅ ADDED: optional playlist cover uploader
             playlist_image = st.file_uploader(
                 "Upload playlist cover (optional, JPG only)",
                 type=["jpg", "jpeg"]
@@ -1063,7 +1048,7 @@ def main():
             popularity_range = popularity_options[popularity_choice]
 
         with col7:
-            #market_filter = st.checkbox("Filter by market availability", value=True)
+            market_filter = st.checkbox("Filter by market availability", value=True)
             max_per_artist = st.number_input("Max tracks per artist", min_value=1, max_value=20, value=5)
 
         # ==================== FOCUS MODE WEIGHTS ====================
@@ -1125,7 +1110,7 @@ def main():
                         year_range,
                         popularity_range,
                         current_user.get('country', 'US'),
-                        #market_filter,
+                        market_filter,
                         max_per_artist
                     )
 
@@ -1190,42 +1175,25 @@ def main():
 
             st.markdown("---")
 
-            # ✅ checkbox: default = private
-            make_public = make_public = st.checkbox("Make playlist public", value=False, key=f"make_public_{time.time()}")
+            make_public = st.checkbox("Make playlist public", value=False)
 
             col_save, col_refill = st.columns(2)
 
             with col_save:
                 if st.button("💾 Save Playlist to Spotify", type="primary", key="save_playlist_btn"):
-                    final_tracks = [
-                        t for t in st.session_state.selected_tracks
-                        if t['id'] not in st.session_state.get('tracks_to_remove', set())
-                    ]
+                    final_tracks = [t for t in st.session_state.selected_tracks if t['id'] not in st.session_state.get('tracks_to_remove', set())]
 
                     if not final_tracks:
                         st.error("No tracks to save!")
                     else:
                         with st.spinner("Creating playlist on Spotify..."):
                             try:
-                                # 🔒 Create playlist PRIVATE by default
                                 playlist = sp.user_playlist_create(
                                     user=current_user['id'],
                                     name=playlist_name,
-                                    public=False  # always start as private
+                                    public=make_public
                                 )
-                                
 
-                                # If user checked "Make playlist public" → flip to public
-                                if make_public:
-                                    try:
-                                        sp.playlist_change_details(
-                                            playlist_id=playlist['id'],
-                                            public=True
-                                        )
-                                    except Exception as e:
-                                        st.error(f"Failed to set playlist public: {e}")
-
-                                # Add tracks
                                 track_uris = [f"spotify:track:{t['id']}" for t in final_tracks]
                                 skipped = []
 
@@ -1233,12 +1201,13 @@ def main():
                                     batch = track_uris[i:i+100]
                                     try:
                                         sp.playlist_add_items(playlist['id'], batch)
-                                    except Exception:
+                                    except Exception as e:
                                         skipped.extend(batch)
 
-                                # ✅ Upload playlist cover if user uploaded an image
+                                # ✅ NEW: upload playlist cover if user uploaded an image
                                 if playlist_image is not None:
                                     try:
+                                        # Use getvalue() so we can safely read the bytes
                                         image_bytes = playlist_image.getvalue()
                                         encoded_image = base64.b64encode(image_bytes).decode("utf-8")
                                         sp.playlist_upload_cover_image(playlist['id'], encoded_image)
@@ -1271,8 +1240,8 @@ def main():
                         ]
                         remaining_tracks.sort(
                             key=lambda t: (t['score']['cross_user_dup_count'],
-                                           t['score']['popularity'],
-                                           t['score']['release_year']),
+                                          t['score']['popularity'],
+                                          t['score']['release_year']),
                             reverse=True
                         )
                         num_to_add = len(st.session_state.tracks_to_remove)
@@ -1348,10 +1317,7 @@ def main():
         with bottom_right:
             st.subheader("⭐ Top Consensus Songs (Not in the Playlist)")
 
-            current_selected_ids = {
-                t['id'] for t in selected_tracks
-                if t['id'] not in st.session_state.get('tracks_to_remove', set())
-            }
+            current_selected_ids = {t['id'] for t in selected_tracks if t['id'] not in st.session_state.get('tracks_to_remove', set())}
 
             if 'filtered_tracks' in st.session_state:
                 scored_tracks = st.session_state.filtered_tracks
