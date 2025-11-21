@@ -785,6 +785,10 @@ def main():
     sp = st.session_state["spotify_client"]
     current_user = st.session_state["current_user"]
 
+    # DEBUG: Show Spotify profile JSON
+    st.subheader("Debug Profile Data")
+    st.json(current_user)
+
     st.sidebar.success(f"✅ Logged in as: **{current_user.get('display_name', current_user.get('id','Unknown'))}**")
 
     # ==================== TOP LAYOUT: PARTY SETUP (LEFT) & FILTERS/SETTINGS (RIGHT) ====================
