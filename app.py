@@ -46,7 +46,7 @@ PLAYLIST_CACHE_FILE = "playlist_cache.json"
 GENRE_CACHE_FILE = "genre_cache.json"
 
 # Spotify API setup - same scope used in v11 & app.py
-SCOPE = "playlist-modify-public playlist-modify-private user-library-read"
+SCOPE = "ugc-image-upload playlist-modify-public playlist-modify-private user-library-read"
 
 # ==================== CACHE MANAGEMENT (from v11) ====================
 def load_cache(filename):
