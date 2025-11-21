@@ -1175,7 +1175,8 @@ def main():
 
             st.markdown("---")
 
-            make_public = st.checkbox("Make playlist public", value=False)
+            make_public = st.checkbox("Make playlist public", value=False, key="make_public")
+
 
             col_save, col_refill = st.columns(2)
 
