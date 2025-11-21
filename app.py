@@ -192,7 +192,7 @@ def validate_user_exists(sp, username):
     except Exception:
         return False, None
 
-def get_user_playlists_data(sp, username, market):
+def get_user_playlists_data(sp, username):
     """Gather all tracks from user's public playlists with metadata"""
     # Check cache first
     cached_data = get_cached_playlists(username)
@@ -246,7 +246,7 @@ def get_user_playlists_data(sp, username, market):
                     'explicit': track.get('explicit', False),
                     'album_release_date': track['album'].get('release_date', ''),
                     'url': track['external_urls'].get('spotify', ''),
-                    'available_markets': track.get('available_markets', []),
+                    #'available_markets': track.get('available_markets', []),
                     'user_id': username,
                     'playlist_name': playlist.get('name', '')
                 }
@@ -308,7 +308,7 @@ def parse_release_year(release_date):
         return None
 
 def filter_tracks(tracks, selected_genres, year_range, popularity_range,
-                  market, market_filter_enabled, max_per_artist):
+                   max_per_artist):
     """Apply all filters to tracks"""
     filtered = []
     artist_count = defaultdict(int)
