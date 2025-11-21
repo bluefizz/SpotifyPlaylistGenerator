@@ -334,9 +334,9 @@ def filter_tracks(tracks, selected_genres, year_range, popularity_range,
                 continue
 
         # Market filter (if enabled)
-        if market_filter_enabled and market:
-            if market not in track.get('available_markets', []):
-                continue
+        #if market_filter_enabled and market:
+            #if market not in track.get('available_markets', []):
+             #   continue
 
         # Max tracks per artist
         artist_key = tuple(sorted(track['artist_ids']))
@@ -1063,7 +1063,7 @@ def main():
             popularity_range = popularity_options[popularity_choice]
 
         with col7:
-            market_filter = st.checkbox("Filter by market availability", value=True)
+            #market_filter = st.checkbox("Filter by market availability", value=True)
             max_per_artist = st.number_input("Max tracks per artist", min_value=1, max_value=20, value=5)
 
         # ==================== FOCUS MODE WEIGHTS ====================
@@ -1125,7 +1125,7 @@ def main():
                         year_range,
                         popularity_range,
                         current_user.get('country', 'US'),
-                        market_filter,
+                        #market_filter,
                         max_per_artist
                     )
 
