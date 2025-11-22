@@ -184,6 +184,9 @@ def ensure_spotify_authenticated():
         # Suggest clearing cache
         st.info("💡 Try deleting any `.cache-*` files and logging in again.")
         st.stop()
+
+        
+        return sp_client, current_user
 # ==================== DATA GATHERING ====================
 
 def extract_username_from_url(url):
