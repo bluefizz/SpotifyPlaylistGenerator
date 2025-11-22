@@ -27,7 +27,7 @@ st.set_page_config(
 )
 
 # Spotify API setup
-SCOPE = "playlist-modify-public playlist-modify-private user-library-read"
+SCOPE = "playlist-modify-public playlist-modify-private user-library-read ugc-image-upload"
 
 # ==================== NEW SPOTIFY AUTHENTICATION (LOGIN SYSTEM A) ====================
 
