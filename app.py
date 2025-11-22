@@ -11,7 +11,7 @@ import random
 import math
 import re
 
-#for cover upload PNG support
+#for cover upload PNG support 
 import base64
 from io import BytesIO
 from PIL import Image
@@ -818,6 +818,35 @@ def get_display_name(username):
         return st.session_state.username_to_display_name.get(username, username)
     return username
 
+# 🔧 NEW: helper to process any image (upload OR camera) for Spotify
+def process_image_for_spotify(image_bytes):
+    """
+    Resize + convert + compress the image until Spotify accepts it (<256 KB JPEG)
+    """
+    try:
+        img = Image.open(BytesIO(image_bytes))
+    except Exception:
+        return None
+
+    # Always convert to JPEG (Spotify requirement)
+    img = img.convert("RGB")
+
+    # Resize if very large (phone cameras etc.)
+    max_dimension = 640
+    img.thumbnail((max_dimension, max_dimension))
+
+    # Compress until < 256 KB or quality too low
+    quality = 90
+    while quality >= 10:
+        buffer = BytesIO()
+        img.save(buffer, format="JPEG", quality=quality)
+        data = buffer.getvalue()
+        if len(data) <= 256 * 1024:
+            return data
+        quality -= 5
+
+    return None  # couldn't get under 256 KB
+
 def main():
     st.title("🎵 Vibescape - Party Playlist Generator")
     st.markdown("Vibescape is an intelligent party-playlist generator that blends the music tastes of you and your friends into one perfectly balanced playlist. Simply enter your guests' Spotify usernames, scan their public playlists, choose the genres and settings you want — and Vibescape builds a personalized party soundtrack based on everyone's real listening history.")
@@ -1251,12 +1280,21 @@ def main():
             col_save, col_refill = st.columns(2)
             
             with col_save:
-                # 🔽 NEW: cover uploader (accepts JPG / JPEG / PNG)
+                # 📸 NEW: allow upload OR live photo
                 uploaded_cover = st.file_uploader(
-                    "Upload playlist cover (JPG or PNG, max 256 KB)",
+                    "Upload playlist cover (JPG or PNG)",
                     type=["jpg", "jpeg", "png"],
                     key="playlist_cover_uploader"
                 )
+
+                photo = st.camera_input("📸 Or take a photo")
+
+                # Decide which image to use (camera has priority)
+                final_image_bytes = None
+                if photo is not None:
+                    final_image_bytes = photo.getvalue()
+                elif uploaded_cover is not None:
+                    final_image_bytes = uploaded_cover.getvalue()
 
                 if st.button("💾 Save Playlist to Spotify", type="primary", key="save_playlist_btn"):
                     final_tracks = [t for t in st.session_state.selected_tracks if t['id'] not in st.session_state.get('tracks_to_remove', set())]
@@ -1283,25 +1321,16 @@ def main():
                                     except Exception as e:
                                         skipped.extend(batch)
 
-                                # 🔽 NEW: handle cover upload AFTER playlist is created
-                                if uploaded_cover is not None:
+                                # 🎨 NEW: handle cover upload (upload OR camera) AFTER playlist is created
+                                if final_image_bytes is not None:
                                     try:
-                                        cover_bytes = uploaded_cover.getvalue()
-                                        if len(cover_bytes) > 256 * 1024:
-                                            st.error("Cover image is larger than 256 KB. Spotify requires images smaller than 256 KB, so the cover was not uploaded.")
+                                        processed_bytes = process_image_for_spotify(final_image_bytes)
+                                        if processed_bytes is None:
+                                            st.error("Image could not be reduced below 256 KB. Try a smaller or simpler photo.")
                                         else:
-                                            # Convert to JPEG (Spotify only supports JPEG for covers)
-                                            img = Image.open(BytesIO(cover_bytes)).convert("RGB")
-                                            buf = BytesIO()
-                                            img.save(buf, format="JPEG", quality=90)
-                                            jpeg_bytes = buf.getvalue()
-
-                                            if len(jpeg_bytes) > 256 * 1024:
-                                                st.error("Converted cover image is still larger than 256 KB, so it could not be uploaded.")
-                                            else:
-                                                encoded_cover = base64.b64encode(jpeg_bytes)
-                                                sp.playlist_upload_cover_image(playlist['id'], encoded_cover)
-                                                st.success("📸 Custom playlist cover uploaded!")
+                                            encoded_cover = base64.b64encode(processed_bytes)
+                                            sp.playlist_upload_cover_image(playlist['id'], encoded_cover)
+                                            st.success("📸 Custom playlist cover uploaded!")
                                     except Exception as cover_err:
                                         st.warning(f"Playlist created, but the cover image could not be processed or uploaded: {cover_err}")
                                 
