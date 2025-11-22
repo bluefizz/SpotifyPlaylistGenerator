@@ -11,6 +11,11 @@ import random
 import math
 import re
 
+#for cover upload PNG support
+import base64
+from io import BytesIO
+from PIL import Image
+
 # Load environment variables
 load_dotenv()
 
@@ -1246,6 +1251,13 @@ def main():
             col_save, col_refill = st.columns(2)
             
             with col_save:
+                # 🔽 NEW: cover uploader (accepts JPG / JPEG / PNG)
+                uploaded_cover = st.file_uploader(
+                    "Upload playlist cover (JPG or PNG, max 256 KB)",
+                    type=["jpg", "jpeg", "png"],
+                    key="playlist_cover_uploader"
+                )
+
                 if st.button("💾 Save Playlist to Spotify", type="primary", key="save_playlist_btn"):
                     final_tracks = [t for t in st.session_state.selected_tracks if t['id'] not in st.session_state.get('tracks_to_remove', set())]
                     
@@ -1270,6 +1282,28 @@ def main():
                                         sp.playlist_add_items(playlist['id'], batch)
                                     except Exception as e:
                                         skipped.extend(batch)
+
+                                # 🔽 NEW: handle cover upload AFTER playlist is created
+                                if uploaded_cover is not None:
+                                    try:
+                                        cover_bytes = uploaded_cover.getvalue()
+                                        if len(cover_bytes) > 256 * 1024:
+                                            st.error("Cover image is larger than 256 KB. Spotify requires images smaller than 256 KB, so the cover was not uploaded.")
+                                        else:
+                                            # Convert to JPEG (Spotify only supports JPEG for covers)
+                                            img = Image.open(BytesIO(cover_bytes)).convert("RGB")
+                                            buf = BytesIO()
+                                            img.save(buf, format="JPEG", quality=90)
+                                            jpeg_bytes = buf.getvalue()
+
+                                            if len(jpeg_bytes) > 256 * 1024:
+                                                st.error("Converted cover image is still larger than 256 KB, so it could not be uploaded.")
+                                            else:
+                                                encoded_cover = base64.b64encode(jpeg_bytes)
+                                                sp.playlist_upload_cover_image(playlist['id'], encoded_cover)
+                                                st.success("📸 Custom playlist cover uploaded!")
+                                    except Exception as cover_err:
+                                        st.warning(f"Playlist created, but the cover image could not be processed or uploaded: {cover_err}")
                                 
                                 st.success(f"🎉 Public playlist '{playlist_name}' created successfully!")
                                 st.markdown(f"[Open in Spotify]({playlist['external_urls']['spotify']})")
