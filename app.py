@@ -31,90 +31,40 @@ SCOPE = "playlist-modify-public playlist-modify-private user-library-read ugc-im
 
 # ==================== NEW SPOTIFY AUTHENTICATION (LOGIN SYSTEM A) ====================
 
+
 def ensure_spotify_authenticated():
-    """
-    Handles Spotify OAuth with a login screen first.
-    - Shows 'Login with Spotify' link if user is not authenticated
-    - Handles redirect with ?code=...
-    - Stores token_info in st.session_state
-    - Refreshes token if expired
-    Returns:
-        sp: authenticated spotipy.Spotify client
-        current_user: dict with current user profile
-    """
     CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
     CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
     REDIRECT_URI = os.getenv("SPOTIPY_REDIRECT_URI")
 
     if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
-        st.error("Spotify credentials are missing. Please set SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, and SPOTIPY_REDIRECT_URI.")
+        st.error("Spotify credentials are missing.")
         st.stop()
 
-    auth_manager = SpotifyOAuth(
+    sp_oauth = SpotifyOAuth(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri=REDIRECT_URI,
         scope=SCOPE,
-        show_dialog=True,
+        cache_path=None,
+        show_dialog=True
     )
 
-    # 1) If we already have a token, maybe refresh it
-    token_info = st.session_state.get("token_info")
-
-    if token_info:
-        try:
-            # Check if token is expired and refresh if needed
-            if auth_manager.is_token_expired(token_info):
-                token_info = auth_manager.refresh_access_token(token_info["refresh_token"])
-                st.session_state["token_info"] = token_info
-        except Exception as e:
-            # If refresh fails, clear token and force re-login
-            st.session_state.pop("token_info", None)
-            token_info = None
-
-    # 2) If we still have no token, check for 'code' in query params (Spotify redirect)
-    if not token_info:
-        query_params = st.experimental_get_query_params()
-        if "code" in query_params:
-            code = query_params["code"][0]
-            try:
-                token_info = auth_manager.get_access_token(code)
-                st.session_state["token_info"] = token_info
-                # Clean URL (remove ?code=...)
-                st.experimental_set_query_params()
-            except Exception as e:
-                st.error(f"Error fetching access token from Spotify: {e}")
-                st.stop()
-        else:
-            # 3) No token and no code → show login screen and stop
-            auth_url = auth_manager.get_authorize_url()
-            st.markdown("# 🔐 Log in with Spotify")
-            st.write(
-                "To use Vibescape, you need to connect your Spotify account. "
-                "Click the button below to log in:"
-            )
-            st.markdown(f"[✅ Login with Spotify]({auth_url})")
-            st.stop()
-
-    # 4) We now have a valid token_info → create Spotify client
-    access_token = token_info.get("access_token")
-    if not access_token:
-        st.error("Failed to obtain Spotify access token.")
+    query = st.experimental_get_query_params()
+    if "code" in query:
+        code = query["code"][0]
+        token_info = sp_oauth.get_access_token(code)
+        st.experimental_set_query_params()
+    else:
+        auth_url = sp_oauth.get_authorize_url()
+        st.markdown("# 🔐 Log in with Spotify")
+        st.markdown(f"[Login with Spotify]({auth_url})")
         st.stop()
 
-    sp = spotipy.Spotify(auth=access_token)
+    sp = spotipy.Spotify(auth=token_info["access_token"])
+    current_user = sp.current_user()
+    return sp, current_user
 
-    # Cache sp + current_user in session_state for convenience
-    if "spotify_client" not in st.session_state:
-        st.session_state.spotify_client = sp
-    if "current_user" not in st.session_state:
-        try:
-            st.session_state.current_user = sp.current_user()
-        except Exception as e:
-            st.error(f"Error fetching current Spotify user: {e}")
-            st.stop()
-
-    return st.session_state.spotify_client, st.session_state.current_user
 
 # ==================== DATA GATHERING ====================
 
