@@ -1,3 +1,4 @@
+
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -10,6 +11,7 @@ from dotenv import load_dotenv
 import random
 import math
 import re
+import glob
 
 #for cover upload PNG support 
 import base64
@@ -19,68 +21,170 @@ from PIL import Image
 # Load environment variables
 load_dotenv()
 
-# Page config
+# ----------------- SMALL UTILS FROM app.py -----------------
+def clean_spotify_cache():
+    """Delete any existing .cache-* files to force fresh Spotify login"""
+    cache_files = glob.glob(".cache-*")
+    for f in cache_files:
+        try:
+            os.remove(f)
+            print(f"Deleted old cache file: {f}")
+        except Exception as e:
+            print(f"Failed to delete {f}: {e}")
+
+# Call this early in your app, before Spotify OAuth
+clean_spotify_cache()
+
+# Page config 
 st.set_page_config(
     page_title="Vibescape - Party Playlist Generator",
     page_icon="🎵",
     layout="wide"
 )
 
-# Spotify API setup
-SCOPE = "playlist-modify-public playlist-modify-private user-library-read ugc-image-upload"
+# ==================== CONFIGURATION ====================
+# Cache file paths
+PLAYLIST_CACHE_FILE = "playlist_cache.json"
+GENRE_CACHE_FILE = "genre_cache.json"
 
-# ==================== NEW SPOTIFY AUTHENTICATION (LOGIN SYSTEM A) ====================
+# Spotify API setup - 
+SCOPE = "ugc-image-upload playlist-modify-public playlist-modify-private user-library-read"
 
+# ==================== CACHE MANAGEMENT ====================
+def load_cache(filename):
+    """Load cache from JSON file"""
+    try:
+        with open(filename, 'r') as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_cache(filename, data):
+    """Save cache to JSON file"""
+    with open(filename, 'w') as f:
+        json.dump(data, f)
+
+def get_cached_playlists(user_id):
+    """Get cached playlist data if still valid (24 hours)"""
+    cache = load_cache(PLAYLIST_CACHE_FILE)
+    if user_id in cache:
+        cached_time = datetime.fromisoformat(cache[user_id]['timestamp'])
+        if datetime.now() - cached_time < timedelta(hours=24):
+            return cache[user_id]['data']
+    return None
+
+def cache_playlists(user_id, data):
+    """Cache playlist data"""
+    cache = load_cache(PLAYLIST_CACHE_FILE)
+    cache[user_id] = {
+        'timestamp': datetime.now().isoformat(),
+        'data': data
+    }
+    save_cache(PLAYLIST_CACHE_FILE, cache)
+
+def get_cached_genres(artist_id):
+    """Get cached artist genres if still valid (30 days)"""
+    cache = load_cache(GENRE_CACHE_FILE)
+    if artist_id in cache:
+        cached_time = datetime.fromisoformat(cache[artist_id]['timestamp'])
+        if datetime.now() - cached_time < timedelta(days=30):
+            return cache[artist_id]['genres']
+    return None
+
+def cache_genres(artist_id, genres):
+    """Cache artist genres"""
+    cache = load_cache(GENRE_CACHE_FILE)
+    cache[artist_id] = {
+        'timestamp': datetime.now().isoformat(),
+        'genres': genres
+    }
+    save_cache(GENRE_CACHE_FILE, cache)
+
+# ==================== SPOTIFY AUTHENTICATION (from app.py) ====================
 def ensure_spotify_authenticated():
+    """
+    Multi-user-safe authentication. Shows login page if no token.
+    Sets:
+      - st.session_state['token_info']
+      - st.session_state['spotify_client']
+      - st.session_state['current_user']
+    """
     CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
     CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
     REDIRECT_URI = os.getenv("SPOTIPY_REDIRECT_URI")
 
     if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
-        st.error("Spotify credentials missing.")
+        st.error("Spotify credentials not set in environment or secrets.")
         st.stop()
 
-    # Unique cache file per visitor
-    visitor_id = st.session_state.get("visitor_id")
+    # Unique cache per visitor session
+    visitor_id = st.session_state.get('visitor_id')
     if not visitor_id:
-        visitor_id = str(int(time.time() * 1000))
-        st.session_state["visitor_id"] = visitor_id
+        visitor_id = str(int(time.time() * 1000))  # simple unique ID
+        st.session_state['visitor_id'] = visitor_id
 
-    cache_path = f".cache-{visitor_id}"
-
-    auth_manager = SpotifyOAuth(
+    sp_oauth = SpotifyOAuth(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri=REDIRECT_URI,
         scope=SCOPE,
-        cache_path=cache_path,
-        show_dialog=True
+        show_dialog=True,
+        cache_path=f".cache-{visitor_id}"
     )
 
-    token_info = auth_manager.get_cached_token()
+    token_info = st.session_state.get("token_info")
 
-    if not token_info:
-        auth_url = auth_manager.get_authorize_url()
-        st.markdown("## 🔐 Log in with Spotify")
-        st.markdown(f"[Click here to log in]({auth_url})")
-        st.stop()
-
-    try:
-        sp = spotipy.Spotify(auth_manager=auth_manager)
-        user = sp.current_user()
-    except Exception:
+    # Refresh token if expired
+    if token_info and sp_oauth.is_token_expired(token_info):
         try:
-            os.remove(cache_path)
-        except:
-            pass
-        auth_url = auth_manager.get_authorize_url()
-        st.markdown("## 🔐 Log in with Spotify")
-        st.markdown(f"[Click here to log in]({auth_url})")
+            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+            st.session_state["token_info"] = token_info
+        except Exception:
+            st.session_state.pop("token_info", None)
+            token_info = None
+
+    # If no token, check for Spotify redirect
+    if not token_info:
+        query_params = st.experimental_get_query_params()
+        if "code" in query_params:
+            code = query_params["code"][0]
+            try:
+                token_info = sp_oauth.get_access_token(code)
+                # Some spotipy versions return dict, sometimes different object — handle dict case
+                if isinstance(token_info, dict):
+                    st.session_state["token_info"] = token_info
+                st.experimental_set_query_params()  # clean URL
+            except Exception as e:
+                st.error(f"Error fetching access token: {e}")
+                st.stop()
+        else:
+            auth_url = sp_oauth.get_authorize_url()
+            # Dedicated login page (Option A): show only login and stop
+            st.markdown("# 🔐 Log in with Spotify")
+            st.markdown("To continue, please log in with your Spotify account.")
+            st.markdown(f"[Login with Spotify]({auth_url})")
+            st.stop()
+
+    # Use access token
+    access_token = token_info.get("access_token") if token_info else None
+    if not access_token:
+        st.error("Failed to get Spotify access token.")
         st.stop()
 
-    st.session_state['spotify_client'] = sp
-    st.session_state['current_user'] = user
-    return sp, user
+    # Initialize Spotify client
+    sp_client = spotipy.Spotify(auth=access_token)
+    st.session_state["spotify_client"] = sp_client
+
+    # Get current user safely
+    try:
+        current_user = sp_client.current_user()
+        st.session_state["current_user"] = current_user
+    except spotipy.exceptions.SpotifyException as e:
+        st.error(f"Error fetching current user: {e}")
+        # Suggest clearing cache
+        st.info("💡 Try deleting any `.cache-*` files and logging in again.")
+        st.stop()
+# ==================== DATA GATHERING ====================
 
 def extract_username_from_url(url):
     """Extract username from Spotify profile URL"""
