@@ -37,67 +37,50 @@ def ensure_spotify_authenticated():
     REDIRECT_URI = os.getenv("SPOTIPY_REDIRECT_URI")
 
     if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
-        st.error("Spotify credentials are missing.")
+        st.error("Spotify credentials missing.")
         st.stop()
 
-    # Create OAuth manager with NO shared cache file
-    sp_oauth = SpotifyOAuth(
+    # Unique cache file per visitor
+    visitor_id = st.session_state.get("visitor_id")
+    if not visitor_id:
+        visitor_id = str(int(time.time() * 1000))
+        st.session_state["visitor_id"] = visitor_id
+
+    cache_path = f".cache-{visitor_id}"
+
+    auth_manager = SpotifyOAuth(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri=REDIRECT_URI,
         scope=SCOPE,
-        cache_path=None,   # 🔒 no shared .cache file
-        show_dialog=True   # ask user to choose account
+        cache_path=cache_path,
+        show_dialog=True
     )
 
-    # 1️⃣ If we already have a token in THIS browser session, reuse/refresh it
-    token_info = st.session_state.get("token_info")
-    if token_info:
-        try:
-            if sp_oauth.is_token_expired(token_info):
-                token_info = sp_oauth.refresh_access_token(token_info["refresh_token"])
-                st.session_state["token_info"] = token_info
-        except Exception:
-            # if refresh fails, force re-login
-            st.session_state.pop("token_info", None)
-            token_info = None
+    token_info = auth_manager.get_cached_token()
 
-    # 2️⃣ If we still don't have a token, handle the Spotify redirect (?code=...)
     if not token_info:
-        params = st.experimental_get_query_params()
-        if "code" in params:
-            try:
-                code = params["code"][0]
-                token_info = sp_oauth.get_access_token(code)
-                st.session_state["token_info"] = token_info
-                # optionally clean URL
-                st.experimental_set_query_params()
-            except Exception as e:
-                st.error(f"Error completing login with Spotify: {e}")
-                st.stop()
-        else:
-            # 3️⃣ No token and no ?code= → show login link and stop app here
-            auth_url = sp_oauth.get_authorize_url()
-            st.markdown("## 🔐 Log in with Spotify")
-            st.write("To use Vibescape, please connect your Spotify account:")
-            st.markdown(f"[✅ Login with Spotify]({auth_url})")
-            st.stop()
-
-    # 4️⃣ Now we have a valid token in token_info
-    access_token = token_info.get("access_token")
-    if not access_token:
-        st.error("Failed to obtain Spotify access token.")
+        auth_url = auth_manager.get_authorize_url()
+        st.markdown("## 🔐 Log in with Spotify")
+        st.markdown(f"[Click here to log in]({auth_url})")
         st.stop()
 
-    sp = spotipy.Spotify(auth=access_token)
     try:
+        sp = spotipy.Spotify(auth_manager=auth_manager)
         user = sp.current_user()
-    except Exception as e:
-        st.error(f"Error fetching current Spotify user: {e}")
+    except Exception:
+        try:
+            os.remove(cache_path)
+        except:
+            pass
+        auth_url = auth_manager.get_authorize_url()
+        st.markdown("## 🔐 Log in with Spotify")
+        st.markdown(f"[Click here to log in]({auth_url})")
         st.stop()
 
+    st.session_state['spotify_client'] = sp
+    st.session_state['current_user'] = user
     return sp, user
-# ==================== DATA GATHERING ====================
 
 def extract_username_from_url(url):
     """Extract username from Spotify profile URL"""
