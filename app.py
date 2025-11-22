@@ -24,91 +24,19 @@ st.set_page_config(
 # Spotify API setup
 SCOPE = "playlist-modify-public playlist-modify-private user-library-read"
 
-# ==================== SPOTIFY AUTHENTICATION (NEW, from app.py) ====================
+# ==================== SPOTIFY AUTHENTICATION ====================
 
-def ensure_spotify_authenticated():
-    """
-    Multi-user-safe authentication. Shows login page if no token.
-    Sets:
-      - st.session_state['token_info']
-      - st.session_state['spotify_client']
-      - st.session_state['current_user']
-    """
-    CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
-    CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
-    REDIRECT_URI = os.getenv("SPOTIPY_REDIRECT_URI")
-
-    if not CLIENT_ID or not CLIENT_SECRET or not REDIRECT_URI:
-        st.error("Spotify credentials not set in environment or secrets.")
-        st.stop()
-
-    # Unique cache per visitor session
-    visitor_id = st.session_state.get('visitor_id')
-    if not visitor_id:
-        visitor_id = str(int(time.time() * 1000))  # simple unique ID
-        st.session_state['visitor_id'] = visitor_id
-
-    sp_oauth = SpotifyOAuth(
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET,
-        redirect_uri=REDIRECT_URI,
+def get_spotify_client():
+    """Initialize and return authenticated Spotify client"""
+    auth_manager = SpotifyOAuth(
+        client_id=os.getenv("SPOTIPY_CLIENT_ID"),
+        client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
+        redirect_uri=os.getenv("SPOTIPY_REDIRECT_URI"),
         scope=SCOPE,
-        show_dialog=True,
-        cache_path=f".cache-{visitor_id}"
+        cache_path=".spotify_cache"
     )
-
-    token_info = st.session_state.get("token_info")
-
-    # Refresh token if expired
-    if token_info and sp_oauth.is_token_expired(token_info):
-        try:
-            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-            st.session_state["token_info"] = token_info
-        except Exception:
-            st.session_state.pop("token_info", None)
-            token_info = None
-
-    # If no token, check for Spotify redirect
-    if not token_info:
-        query_params = st.experimental_get_query_params()
-        if "code" in query_params:
-            code = query_params["code"][0]
-            try:
-                token_info = sp_oauth.get_access_token(code)
-                # Some spotipy versions return dict, sometimes different object — handle dict case
-                if isinstance(token_info, dict):
-                    st.session_state["token_info"] = token_info
-                st.experimental_set_query_params()  # clean URL
-            except Exception as e:
-                st.error(f"Error fetching access token: {e}")
-                st.stop()
-        else:
-            auth_url = sp_oauth.get_authorize_url()
-            # Dedicated login page: show only login and stop
-            st.markdown("# 🔐 Log in with Spotify")
-            st.markdown("To continue, please log in with your Spotify account.")
-            st.markdown(f"[Login with Spotify]({auth_url})")
-            st.stop()
-
-    # Use access token
-    access_token = token_info.get("access_token") if token_info else None
-    if not access_token:
-        st.error("Failed to get Spotify access token.")
-        st.stop()
-
-    # Initialize Spotify client
-    sp_client = spotipy.Spotify(auth=access_token)
-    st.session_state["spotify_client"] = sp_client
-
-    # Get current user safely
-    try:
-        current_user = sp_client.current_user()
-        st.session_state["current_user"] = current_user
-    except spotipy.exceptions.SpotifyException as e:
-        st.error(f"Error fetching current user: {e}")
-        # Suggest clearing cache
-        st.info("💡 Try deleting any `.cache-*` files and logging in again.")
-        st.stop()
+    
+    return spotipy.Spotify(auth_manager=auth_manager)
 
 # ==================== DATA GATHERING ====================
 
@@ -820,13 +748,19 @@ def main():
     💡 **Tip for Best Results:**  
     For a more accurate and personalized mix, guests should temporarily make some of their playlists public and ensure these public playlists are actually linked to their Spotify profile. When making playlists public, also select "Add to your profile" to allow Vibescape to access them. The more public playlists available, the better the playlist will reflect everyone's taste!
     """)
-
-    # 🔐 NEW: use multi-user-safe auth instead of get_spotify_client()
-    ensure_spotify_authenticated()
-    sp = st.session_state["spotify_client"]
-    current_user = st.session_state["current_user"]
     
-    st.sidebar.success(f"✅ Logged in as: **{current_user.get('display_name', current_user.get('id', 'Unknown'))}**")
+    if 'spotify_client' not in st.session_state:
+        try:
+            st.session_state.spotify_client = get_spotify_client()
+            st.session_state.current_user = st.session_state.spotify_client.current_user()
+        except Exception as e:
+            st.error("Failed to authenticate with Spotify. Please check your credentials.")
+            st.stop()
+    
+    sp = st.session_state.spotify_client
+    current_user = st.session_state.current_user
+    
+    st.sidebar.success(f"✅ Logged in as: **{current_user['display_name']}**")
     
     # ⛔ Removed old st.header("Step 1: Create Guest List")
     
@@ -837,7 +771,7 @@ def main():
         st.subheader("Step 1: Create Guest List")
         guest_input = st.text_area(
             "Spotify usernames, profile IDs, or profile URLs (one per line)",
-            help="Enter Spotify usernames, profile IDs, or paste profile URLs (e.g. https://open.spotify.com/user/USERNAME)",
+            help="Enter Spotify usernames, profile IDs, or paste profile URLs (e.g., https://open.spotify.com/user/USERNAME)",
             height=150,
             key="guest_input"
         )
@@ -874,7 +808,7 @@ def main():
             st.info(f"👥 {len(guests)} guest(s) added")
             
             if st.button("✓ Validate Usernames", key="validate_btn"):
-                with st.spinner("Validating usernames."):
+                with st.spinner("Validating usernames..."):
                     validated_guests = {}
                     username_to_display_name = {}
                     invalid_users = []
