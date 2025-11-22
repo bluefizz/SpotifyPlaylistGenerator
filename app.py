@@ -31,7 +31,6 @@ SCOPE = "playlist-modify-public playlist-modify-private user-library-read ugc-im
 
 # ==================== NEW SPOTIFY AUTHENTICATION (LOGIN SYSTEM A) ====================
 
-
 def ensure_spotify_authenticated():
     CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
     CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
@@ -41,31 +40,40 @@ def ensure_spotify_authenticated():
         st.error("Spotify credentials are missing.")
         st.stop()
 
+    # 🔒 VERY IMPORTANT:
+    # cache_path=None ensures NO SHARED TOKEN
     sp_oauth = SpotifyOAuth(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri=REDIRECT_URI,
         scope=SCOPE,
-        cache_path=None,
-        show_dialog=True
+        cache_path=None,       # <-- NO SHARED CACHE
+        show_dialog=True       # <-- FORCE LOGIN EVERY TIME
     )
 
-    query = st.experimental_get_query_params()
-    if "code" in query:
-        code = query["code"][0]
-        token_info = sp_oauth.get_access_token(code)
-        st.experimental_set_query_params()
+    # check for redirect "code"
+    params = st.experimental_get_query_params()
+    if "code" in params:
+        try:
+            code = params["code"][0]
+            token_info = sp_oauth.get_access_token(code)
+            access_token = token_info["access_token"]
+            st.experimental_set_query_params()  # clear ?code=
+        except Exception as e:
+            st.error("Error completing login: " + str(e))
+            st.stop()
     else:
+        # No token → redirect to Spotify login
         auth_url = sp_oauth.get_authorize_url()
-        st.markdown("# 🔐 Log in with Spotify")
-        st.markdown(f"[Login with Spotify]({auth_url})")
+        st.markdown("## 🔐 Log in with Spotify")
+        st.markdown(f"[**Click here to log in**]({auth_url})")
         st.stop()
 
-    sp = spotipy.Spotify(auth=token_info["access_token"])
-    current_user = sp.current_user()
-    return sp, current_user
+    # build Spotify client
+    sp = spotipy.Spotify(auth=access_token)
+    user = sp.current_user()
 
-
+    return sp, user
 # ==================== DATA GATHERING ====================
 
 def extract_username_from_url(url):
