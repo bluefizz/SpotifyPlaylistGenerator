@@ -186,7 +186,7 @@ def ensure_spotify_authenticated():
         st.stop()
 
         
-        return sp_client, current_user
+    return sp_client, current_user
 # ==================== DATA GATHERING ====================
 
 def extract_username_from_url(url):
