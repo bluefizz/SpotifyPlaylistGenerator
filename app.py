@@ -39,8 +39,8 @@ clean_spotify_cache()
 
 # Page config 
 st.set_page_config(
-    page_title="CrowdSync - Party Playlist Generator",
-    page_icon="🎵",
+   # page_title="CrowdSync - Party Playlist Generator",
+   # page_icon="🎵",
     layout="wide"
 )
 
@@ -95,9 +95,15 @@ logo_base64 = get_logo_base64()
 
 st.markdown(
     f"""
-    <div style="display:flex; justify-content:center; margin-top:10px; margin-bottom:10px;">
-        <img src="data:image/png;base64,{logo_base64}" width="180">
+    <div style="
+        position: absolute;
+        top: 10px;
+        left: 15px;
+        z-index: 9999;
+    ">
+        <img src="data:image/png;base64,{logo_base64}" style="width: 220px;">
     </div>
+    <div style="height: 80px;"></div>
     """,
     unsafe_allow_html=True
 )
