@@ -1432,30 +1432,50 @@ def main():
             col_save, col_refill = st.columns(2)
             
             with col_save:
-                upload_col, camera_col, save_col, copy_col = st.columns([1.2,1.2,2,1.2])
+                st.markdown("""
+                <style>
+                .small-btn {
+                    padding: 8px 14px;
+                    background:#2b6cff;
+                    border:none;
+                    border-radius:8px;
+                    color:white;
+                    font-size:14px;
+                    cursor:pointer;
+                }
+                .small-btn:hover {
+                    background:#4d8dff;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+
+            upload_col, camera_col, save_col, copy_col = st.columns([1,1,2,1])
+
+            # hidden uploader
+            uploaded_cover = st.file_uploader(
+                "upload_hidden",
+                type=["jpg","jpeg","png"],
+                label_visibility="collapsed",
+                key="playlist_cover_uploader"
+            )
 
             with upload_col:
-                uploaded_cover = st.file_uploader(
-                    "Upload",
-                    type=["jpg","jpeg","png"],
-                    key="playlist_cover_uploader"
+                st.markdown(
+                    "<button class='small-btn'>📁 Upload</button>",
+                    unsafe_allow_html=True
                 )
 
             with camera_col:
-                photo = st.camera_input("📸")
-
-            final_image_bytes = None
-            if photo is not None:
-                final_image_bytes = photo.getvalue()
-            elif uploaded_cover is not None:
-                final_image_bytes = uploaded_cover.getvalue()
+                st.markdown(
+                    "<button class='small-btn'>📸 Camera</button>",
+                    unsafe_allow_html=True
+                )
 
             with save_col:
                 save_clicked = st.button(
                     "💾 Save Playlist",
                     type="primary",
-                    use_container_width=True,
-                    key="save_playlist_btn"
+                    use_container_width=True
                 )
 
             with copy_col:
@@ -1463,10 +1483,6 @@ def main():
                 if playlist_url:
                     if st.button("📋 Copy", use_container_width=True):
                         st.session_state["copy_trigger"] = True
-
-            if playlist_url and st.session_state.get("copy_trigger"):
-                st.success("✅ Link copied!")
-                st.session_state["copy_trigger"] = False
                 if save_clicked:
                     final_tracks = [t for t in st.session_state.selected_tracks if t['id'] not in st.session_state.get('tracks_to_remove', set())]
                     
