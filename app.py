@@ -102,12 +102,21 @@ logo_base64 = get_logo_base64()
 
 st.markdown(
     f"""
-    <div style="
-        width: 100%;
-        text-align: center;
-        margin-top: 20px;
-        margin-bottom: 40px;
-    ">
+    <style>
+        .block-container {{
+            padding-top: 0rem !important;
+            margin-top: 0rem !important;
+        }}
+
+        .app-logo-wrapper {{
+            width: 100%;
+            text-align: center;
+            margin-top: 0px;
+            margin-bottom: 20px;
+        }}
+    </style>
+
+    <div class="app-logo-wrapper">
         <img src="data:image/png;base64,{logo_base64}" style="width: 360px;">
     </div>
     """,
