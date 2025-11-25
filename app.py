@@ -1012,10 +1012,7 @@ def main():
     sp, current_user = ensure_spotify_authenticated()
     
     st.sidebar.success(f"✅ Logged in as: **{current_user.get('display_name', current_user.get('id', 'Unknown'))}**")
-    
-    # ⛔ Removed old st.header("Step 1: Create Guest List")
-    
-    top_left = st.columns()
+
     
     with st.container():
         # ✅ Renamed this subheader as requested
