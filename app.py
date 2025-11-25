@@ -1432,56 +1432,52 @@ def main():
             col_save, col_refill = st.columns(2)
             
             with col_save:
-                col1, col2, col3 = st.columns([2, 2, 3])
+                st.markdown("""
+            <style>
+            .flex-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                width: 100%;
+                gap: 20px;
+            }
+            .flex-item {
+                flex: 1;
+            }
+            </style>
+            """, unsafe_allow_html=True)
 
-        # ----- COLUMN 1: Upload -----
-        with col1:
-            uploaded_cover = st.file_uploader(
-                "Upload cover (JPG/PNG)",
-                type=["jpg", "jpeg", "png"],
-                key="playlist_cover_uploader"
-            )
+            st.markdown('<div class="flex-row">', unsafe_allow_html=True)
 
-        # ----- COLUMN 2: Camera -----
-        with col2:
-            photo = st.camera_input("📸 Take a photo")
+            col1 = st.container()
+            col2 = st.container()
+            col3 = st.container()
 
-        # Decide image
-        final_image_bytes = None
-        if photo:
-            final_image_bytes = photo.getvalue()
-        elif uploaded_cover:
-            final_image_bytes = uploaded_cover.getvalue()
+            with col1:
+                uploaded_cover = st.file_uploader(
+                    "Upload cover",
+                    type=["jpg","jpeg","png"],
+                    key="playlist_cover_uploader"
+                )
 
-        # ----- COLUMN 3: Save + Link -----
-        with col3:
-            save_clicked = st.button(
-                "💾 Save Playlist to Spotify",
-                type="primary",
-                use_container_width=True,
-                key="save_playlist_btn"
-            )
+            with col2:
+                photo = st.camera_input("📸 Take a photo")
 
-            playlist_url = st.session_state.get("created_playlist_url")
+            with col3:
+                save_clicked = st.button(
+                    "💾 Save Playlist",
+                    type="primary",
+                    use_container_width=True
+                )
 
-            if playlist_url:
-                link_row1, link_row2 = st.columns([5,1])
-
-                with link_row1:
-                    st.text_input(
-                        "Playlist Link",
-                        playlist_url,
-                        key="playlist_link_box"
-                    )
-
-                with link_row2:
-                    if st.button("📋", help="Copy"):
+                playlist_url = st.session_state.get("created_playlist_url")
+                if playlist_url:
+                    st.text_input("Playlist Link", playlist_url)
+                    if st.button("📋 Copy"):
                         st.session_state["copy_trigger"] = True
 
-            if st.session_state.get("copy_trigger"):
-                st.success("✅ Link copied!")
-                st.session_state["copy_trigger"] = False
-                if save_clicked:
+            st.markdown('</div>', unsafe_allow_html=True)
+            if save_clicked:
                     final_tracks = [t for t in st.session_state.selected_tracks if t['id'] not in st.session_state.get('tracks_to_remove', set())]
                     
                     if not final_tracks:
