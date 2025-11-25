@@ -1,3 +1,4 @@
+
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -11,9 +12,6 @@ import random
 import math
 import re
 import glob
-
-# NEW: for custom HTML/JS (copy-to-clipboard)
-import streamlit.components.v1 as components
 
 #for cover upload PNG support 
 import base64
@@ -1369,34 +1367,7 @@ def main():
                 elif uploaded_cover is not None:
                     final_image_bytes = uploaded_cover.getvalue()
 
-                # ▶️ NEW: Button + link + copy side by side
-                btn_col, link_col = st.columns([1, 2])
-
-                with btn_col:
-                    save_clicked = st.button(
-                        "💾 Save Playlist to Spotify",
-                        type="primary",
-                        key="save_playlist_btn"
-                    )
-
-                with link_col:
-                    playlist_url = st.session_state.get("created_playlist_url")
-                    if playlist_url:
-                        # Text + copy button using HTML/JS
-                        components.html(
-                            f"""
-                            <div style="display:flex; align-items:center; gap:8px;">
-                                <input id="playlist-link-input" type="text" value="{playlist_url}" style="width:100%; padding:4px;" readonly />
-                                <button style="padding:4px 8px; cursor:pointer;"
-                                    onclick="navigator.clipboard.writeText(document.getElementById('playlist-link-input').value)">
-                                    Copy
-                                </button>
-                            </div>
-                            """,
-                            height=50,
-                        )
-
-                if save_clicked:
+                if st.button("💾 Save Playlist to Spotify", type="primary", key="save_playlist_btn"):
                     final_tracks = [t for t in st.session_state.selected_tracks if t['id'] not in st.session_state.get('tracks_to_remove', set())]
                     
                     if not final_tracks:
@@ -1410,9 +1381,6 @@ def main():
                                     name=playlist_name,
                                     public=True
                                 )
-
-                                # Save link to session state so we can show + copy it
-                                st.session_state["created_playlist_url"] = playlist['external_urls']['spotify']
                                 
                                 track_uris = [f"spotify:track:{t['id']}" for t in final_tracks]
                                 skipped = []
