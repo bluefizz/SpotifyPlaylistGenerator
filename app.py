@@ -114,13 +114,14 @@ st.markdown(
     <style>
         .app-logo {{
             position: fixed;
-            top: 10px;
-            left: 10px;
+            top: 15px;
+            left: 20px;
             z-index: 9999;
         }}
-        /* reduce top padding caused by Streamlit */
-        .block-container {{
-            padding-top: 120px !important;
+
+        /* Move all Streamlit content DOWN */
+        div.block-container {{
+            margin-top: 140px !important;
         }}
     </style>
 
