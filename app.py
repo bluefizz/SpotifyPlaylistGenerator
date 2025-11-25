@@ -111,18 +111,19 @@ st.markdown("""
 
 st.markdown(
     f"""
-    <div style="
-        position: absolute;
-        top: -30px;
-        left: 0px;
-        z-index: 9999;
-        text-align: left;
-        padding-left: 15px;
-        width: 100%;
-        display: flex;
-        justify-content: flex-start;
-    ">
-        <img src="data:image/png;base64,{logo_base64}" style="width: 350px;">
+    <style>
+        .logo-container {{
+            position: fixed;
+            top: 10px;
+            left: 20px;
+            z-index: 9999;
+        }}
+        body {{
+            margin-top: 120px !important;
+        }}
+    </style>
+    <div class="logo-container">
+        <img src="data:image/png;base64,{logo_base64}" style="width: 260px;">
     </div>
     """,
     unsafe_allow_html=True
