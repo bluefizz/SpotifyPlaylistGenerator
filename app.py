@@ -1015,9 +1015,9 @@ def main():
     
     # ⛔ Removed old st.header("Step 1: Create Guest List")
     
-    top_left, top_right = st.columns(2)
+    top_left = st.columns()
     
-    with top_left:
+    with st.container():
         # ✅ Renamed this subheader as requested
         st.header("Step 1: Create Guest List")
         guest_input = st.text_area(
@@ -1189,7 +1189,10 @@ def main():
                 st.success(f"✅ Successfully gathered {len(all_tracks)} tracks from {len(guests)} guests!")
                 st.rerun()
     
-    with top_right:
+        if not st.session_state.get("validation_complete", False):
+         st.info("👆 Complete Step 1 and validate usernames to continue.")
+         st.stop()
+
         st.header("Step 2: Select Genre & Filters")
         
         selected_genres = []
