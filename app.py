@@ -108,7 +108,6 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
-
 st.markdown(
     f"""
     <style>
@@ -125,7 +124,7 @@ st.markdown(
         }}
     </style>
 
-    <img class="app-logo" src="data:image/png;base64,{logo_base64}" width="360">
+    <img class="app-logo" src="data:image/png;base64,{logo_base64}" width="260">
     """,
     unsafe_allow_html=True
 )
