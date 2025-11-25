@@ -1517,6 +1517,28 @@ def main():
                                         st.warning(f"Playlist created, but the cover image could not be processed or uploaded: {cover_err}")
                                 
                                 st.success(f"🎉 Public playlist '{playlist_name}' created successfully!")
+                            
+                                playlist_url = playlist['external_urls']['spotify']
+                                st.session_state["created_playlist_url"] = playlist_url
+
+                                st.markdown("### 🔗 Playlist Link")
+
+                                components.html(
+                                    f"""
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <input id="playlist-link-input"
+                                            type="text"
+                                            value="{playlist_url}"
+                                            style="width:100%; padding:6px; border-radius:6px; border:1px solid #ccc;"
+                                            readonly />
+                                        <button style="padding:6px 10px; cursor:pointer; border-radius:6px; border:none; background:#0E6EFF; color:white;"
+                                            onclick="navigator.clipboard.writeText(document.getElementById('playlist-link-input').value)">
+                                            Copy
+                                        </button>
+                                    </div>
+                                    """,
+                                    height=50,
+                                )                                                                    
                                 st.markdown(f"[Open in Spotify]({playlist['external_urls']['spotify']})")
                                 
                                 if skipped:
