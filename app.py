@@ -112,12 +112,15 @@ st.markdown("""
 st.markdown(
     f"""
     <div style="
-        position: relative;
-        top: -40px;
+        position: absolute;
+        top: -30px;
         left: 0px;
         z-index: 9999;
-        text-align: center;
-        margin-bottom: -20px;
+        text-align: left;
+        padding-left: 15px;
+        width: 100%;
+        display: flex;
+        justify-content: flex-start;
     ">
         <img src="data:image/png;base64,{logo_base64}" style="width: 350px;">
     </div>
