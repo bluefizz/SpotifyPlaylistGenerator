@@ -39,10 +39,52 @@ clean_spotify_cache()
 
 # Page config 
 st.set_page_config(
-    page_title="Vibescape - Party Playlist Generator",
+    page_title="CrowdSync - Party Playlist Generator",
     page_icon="🎵",
     layout="wide"
 )
+
+# ==== Blue UI (STREAMLIT) ====
+st.markdown("""
+<style>
+:root {
+    --primary-color: #0E6EFF;
+    --accent-color: #4DB8FF;
+}
+
+.stButton>button {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+    border-radius: 8px;
+    border: none;
+    transition: 0.2s ease;
+}
+
+.stButton>button:hover {
+    background-color: var(--accent-color) !important;
+    transform: translateY(-2px);
+    box-shadow: 0px 0px 12px rgba(14,110,255,0.5);
+}
+
+.streamlit-expanderHeader {
+    color: var(--primary-color) !important;
+}
+
+.css-1n76uvr, .css-1v3fvcr, .css-ffhzg2 {
+    color: var(--primary-color) !important;
+}
+
+.stProgress > div > div > div > div {
+    background-color: var(--primary-color) !important;
+}
+
+.stAlert {
+    border-left: 4px solid var(--primary-color) !important;
+    border-radius: 6px;
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 # ==================== CONFIGURATION ====================
 # Cache file paths
