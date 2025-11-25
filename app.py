@@ -103,7 +103,7 @@ st.markdown(
     ">
         <img src="data:image/png;base64,{logo_base64}" style="width: 350px;">
     </div>
-    <div style="height: 100px;"></div>
+    <div style="height: 60px;"></div>
     """,
     unsafe_allow_html=True
 )
