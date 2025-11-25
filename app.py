@@ -104,7 +104,7 @@ st.markdown(
     f"""
     <style>
         .app-logo {{
-            position: fixed;
+            position: absolute;
             top: 15px;
             left: 50%;
             transform: translateX(-50%);
