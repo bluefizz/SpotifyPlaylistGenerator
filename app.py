@@ -1432,44 +1432,54 @@ def main():
             col_save, col_refill = st.columns(2)
             
             with col_save:
-                col_upload, col_actions = st.columns([2,3])
+                col1, col2, col3 = st.columns([2, 2, 3])
 
-            with col_upload:
-                uploaded_cover = st.file_uploader(
-                    "Upload playlist cover (JPG or PNG)",
-                    type=["jpg", "jpeg", "png"],
-                    key="playlist_cover_uploader"
-                )
+        # ----- COLUMN 1: Upload -----
+        with col1:
+            uploaded_cover = st.file_uploader(
+                "Upload cover (JPG/PNG)",
+                type=["jpg", "jpeg", "png"],
+                key="playlist_cover_uploader"
+            )
 
-                photo = st.camera_input("📸 Or take a photo")
+        # ----- COLUMN 2: Camera -----
+        with col2:
+            photo = st.camera_input("📸 Take a photo")
 
-                final_image_bytes = None
-                if photo:
-                    final_image_bytes = photo.getvalue()
-                elif uploaded_cover:
-                    final_image_bytes = uploaded_cover.getvalue()
+        # Decide image
+        final_image_bytes = None
+        if photo:
+            final_image_bytes = photo.getvalue()
+        elif uploaded_cover:
+            final_image_bytes = uploaded_cover.getvalue()
 
-            with col_actions:
-                save_clicked = st.button(
-                    "💾 Save Playlist to Spotify",
-                    type="primary",
-                    use_container_width=True
-                )
+        # ----- COLUMN 3: Save + Link -----
+        with col3:
+            save_clicked = st.button(
+                "💾 Save Playlist to Spotify",
+                type="primary",
+                use_container_width=True,
+                key="save_playlist_btn"
+            )
 
-                playlist_url = st.session_state.get("created_playlist_url")
+            playlist_url = st.session_state.get("created_playlist_url")
 
-                if playlist_url:
+            if playlist_url:
+                link_row1, link_row2 = st.columns([5,1])
+
+                with link_row1:
                     st.text_input(
                         "Playlist Link",
                         playlist_url,
                         key="playlist_link_box"
                     )
 
-                    if st.button("📋 Copy Link"):
+                with link_row2:
+                    if st.button("📋", help="Copy"):
                         st.session_state["copy_trigger"] = True
 
             if st.session_state.get("copy_trigger"):
-                st.info("✅ Link copied!")
+                st.success("✅ Link copied!")
                 st.session_state["copy_trigger"] = False
                 if save_clicked:
                     final_tracks = [t for t in st.session_state.selected_tracks if t['id'] not in st.session_state.get('tracks_to_remove', set())]
