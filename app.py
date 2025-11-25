@@ -101,9 +101,9 @@ st.markdown(
         left: 15px;
         z-index: 9999;
     ">
-        <img src="data:image/png;base64,{logo_base64}" style="width: 220px;">
+        <img src="data:image/png;base64,{logo_base64}" style="width: 250px;">
     </div>
-    <div style="height: 80px;"></div>
+    <div style="height: 100px;"></div>
     """,
     unsafe_allow_html=True
 )
@@ -985,7 +985,7 @@ def process_image_for_spotify(image_bytes):
     return None  # couldn't get under 256 KB
 
 def main():
-    st.title("🎵 Crowdsync - Party Playlist Generator")
+    # st.title("🎵 Crowdsync - Party Playlist Generator")
     st.markdown("Crowdsync is an intelligent party-playlist generator that blends the music tastes of you and your friends into one perfectly balanced playlist. Simply enter your guests' Spotify usernames, scan their public playlists, choose the genres and settings you want — and Crowdsync builds a personalized party soundtrack based on everyone's real listening history.")
     
     st.info("""
