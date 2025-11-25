@@ -1437,7 +1437,7 @@ def main():
             .flex-row {
                 display: flex;
                 justify-content: space-between;
-                align-items: center;
+                align-items: flex-start;
                 width: 100%;
                 gap: 20px;
             }
@@ -1462,6 +1462,13 @@ def main():
 
             with col2:
                 photo = st.camera_input("📸 Take a photo")
+
+            # ✅ FIX: define final_image_bytes here
+            final_image_bytes = None
+            if photo is not None:
+                final_image_bytes = photo.getvalue()
+            elif uploaded_cover is not None:
+                final_image_bytes = uploaded_cover.getvalue()
 
             with col3:
                 save_clicked = st.button(
