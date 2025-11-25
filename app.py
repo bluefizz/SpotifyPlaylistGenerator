@@ -86,6 +86,22 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
+def get_logo_base64():
+    with open("crowdsync.png", "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+logo_base64 = get_logo_base64()
+
+st.markdown(
+    f"""
+    <div style="display:flex; justify-content:center; margin-top:10px; margin-bottom:10px;">
+        <img src="data:image/png;base64,{logo_base64}" width="180">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 # ==================== CONFIGURATION ====================
 # Cache file paths
 PLAYLIST_CACHE_FILE = "playlist_cache.json"
@@ -963,12 +979,12 @@ def process_image_for_spotify(image_bytes):
     return None  # couldn't get under 256 KB
 
 def main():
-    st.title("🎵 Vibescape - Party Playlist Generator")
-    st.markdown("Vibescape is an intelligent party-playlist generator that blends the music tastes of you and your friends into one perfectly balanced playlist. Simply enter your guests' Spotify usernames, scan their public playlists, choose the genres and settings you want — and Vibescape builds a personalized party soundtrack based on everyone's real listening history.")
+    st.title("🎵 Crowdsync - Party Playlist Generator")
+    st.markdown("Crowdsync is an intelligent party-playlist generator that blends the music tastes of you and your friends into one perfectly balanced playlist. Simply enter your guests' Spotify usernames, scan their public playlists, choose the genres and settings you want — and Crowdsync builds a personalized party soundtrack based on everyone's real listening history.")
     
     st.info("""
     💡 **Tip for Best Results:**  
-    For a more accurate and personalized mix, guests should temporarily make some of their playlists public and ensure these public playlists are actually linked to their Spotify profile. When making playlists public, also select "Add to your profile" to allow Vibescape to access them. The more public playlists available, the better the playlist will reflect everyone's taste!
+    For a more accurate and personalized mix, guests should temporarily make some of their playlists public and ensure these public playlists are actually linked to their Spotify profile. When making playlists public, also select "Add to your profile" to allow Crowdsync to access them. The more public playlists available, the better the playlist will reflect everyone's taste!
     """)
 
     # 🔐 NEW: use the login/authentication flow first
@@ -1228,7 +1244,7 @@ def main():
             st.markdown("**Playlist Settings**")
             
             st.markdown("*Playlist Name*")
-            playlist_name = st.text_input("Playlist name", "Vibescape Playlist", label_visibility="collapsed", key="playlist_name_input")
+            playlist_name = st.text_input("Playlist name", "Crowdsync Playlist", label_visibility="collapsed", key="playlist_name_input")
             
             st.markdown("*Number of Tracks*")
             num_tracks = st.number_input("Number of tracks", min_value=10, max_value=200, value=40, label_visibility="collapsed")
