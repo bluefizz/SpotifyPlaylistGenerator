@@ -1432,43 +1432,49 @@ def main():
             col_save, col_refill = st.columns(2)
             
             with col_save:
-               upload_col, camera_col, save_col, copy_col = st.columns([1,1,2,1])
+                # 📸 NEW: allow upload OR live photo
+                uploaded_cover = st.file_uploader(
+                    "Upload playlist cover (JPG or PNG)",
+                    type=["jpg", "jpeg", "png"],
+                    key="playlist_cover_uploader"
+                )
 
-    final_image_bytes = None  # ✅ IMPORTANT
+                photo = st.camera_input("📸 Or take a photo")
 
-    uploaded_cover = st.file_uploader(
-        "upload_hidden",
-        type=["jpg","jpeg","png"],
-        label_visibility="collapsed",
-        key="playlist_cover_uploader"
-    )
+                # Decide which image to use (camera has priority)
+                final_image_bytes = None
+                if photo is not None:
+                    final_image_bytes = photo.getvalue()
+                elif uploaded_cover is not None:
+                    final_image_bytes = uploaded_cover.getvalue()
 
-    photo = st.camera_input("camera_hidden")
+                # ▶️ NEW: Button + link + copy side by side
+                btn_col, link_col = st.columns([1, 2])
 
-    if uploaded_cover is not None:
-        final_image_bytes = uploaded_cover.getvalue()
+                with btn_col:
+                    save_clicked = st.button(
+                        "💾 Save Playlist to Spotify",
+                        type="primary",
+                        key="save_playlist_btn"
+                    )
 
-    if photo is not None:
-        final_image_bytes = photo.getvalue()
+                with link_col:
+                    playlist_url = st.session_state.get("created_playlist_url")
+                    if playlist_url:
+                        # Text + copy button using HTML/JS
+                        components.html(
+                            f"""
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <input id="playlist-link-input" type="text" value="{playlist_url}" style="width:100%; padding:4px;" readonly />
+                                <button style="padding:4px 8px; cursor:pointer;"
+                                    onclick="navigator.clipboard.writeText(document.getElementById('playlist-link-input').value)">
+                                    Copy
+                                </button>
+                            </div>
+                            """,
+                            height=50,
+                        )
 
-    with upload_col:
-        st.button("📁 Upload", use_container_width=True)
-
-    with camera_col:
-        st.button("📸 Camera", use_container_width=True)
-
-    with save_col:
-        save_clicked = st.button(
-            "💾 Save Playlist",
-            type="primary",
-            use_container_width=True
-        )
-
-    with copy_col:
-        playlist_url = st.session_state.get("created_playlist_url")
-        if playlist_url:
-            if st.button("📋 Copy", use_container_width=True):
-                st.session_state["copy_trigger"] = True
                 if save_clicked:
                     final_tracks = [t for t in st.session_state.selected_tracks if t['id'] not in st.session_state.get('tracks_to_remove', set())]
                     
