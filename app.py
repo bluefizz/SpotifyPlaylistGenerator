@@ -1432,46 +1432,48 @@ def main():
             col_save, col_refill = st.columns(2)
             
             with col_save:
-                upload_col, camera_col, save_col, copy_col = st.columns([1,1,1,1])
-
-            with upload_col:
+                # 📸 NEW: allow upload OR live photo
                 uploaded_cover = st.file_uploader(
-                    "",
+                    "Upload playlist cover (JPG or PNG)",
                     type=["jpg", "jpeg", "png"],
-                    key="playlist_cover_uploader",
-                    label_visibility="collapsed"
-                )
-                st.caption("Upload")
-
-            with camera_col:
-                photo = st.camera_input("")
-                st.caption("📸 Camera")
-
-            # decide image
-            final_image_bytes = None
-            if photo is not None:
-                final_image_bytes = photo.getvalue()
-            elif uploaded_cover is not None:
-                final_image_bytes = uploaded_cover.getvalue()
-
-            with save_col:
-                save_clicked = st.button(
-                    "💾 Save",
-                    type="primary",
-                    key="save_playlist_btn"
+                    key="playlist_cover_uploader"
                 )
 
-            with copy_col:
-                playlist_url = st.session_state.get("created_playlist_url")
-                if playlist_url:
-                    if st.button("📋 Copy", key="copy_btn"):
-                        st.session_state["copy_trigger"] = True
+                photo = st.camera_input("📸 Or take a photo")
 
-            # copy behavior
-            if playlist_url and st.session_state.get("copy_trigger"):
-                st.code(playlist_url)
-                st.info("✅ Link copied!")
-                st.session_state["copy_trigger"] = False
+                # Decide which image to use (camera has priority)
+                final_image_bytes = None
+                if photo is not None:
+                    final_image_bytes = photo.getvalue()
+                elif uploaded_cover is not None:
+                    final_image_bytes = uploaded_cover.getvalue()
+
+                # ▶️ NEW: Button + link + copy side by side
+                btn_col, link_col = st.columns([1, 2])
+
+                with btn_col:
+                    save_clicked = st.button(
+                        "💾 Save Playlist to Spotify",
+                        type="primary",
+                        key="save_playlist_btn"
+                    )
+
+                with link_col:
+                    playlist_url = st.session_state.get("created_playlist_url")
+                    if playlist_url:
+                        # Text + copy button using HTML/JS
+                        components.html(
+                            f"""
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <input id="playlist-link-input" type="text" value="{playlist_url}" style="width:100%; padding:4px;" readonly />
+                                <button style="padding:4px 8px; cursor:pointer;"
+                                    onclick="navigator.clipboard.writeText(document.getElementById('playlist-link-input').value)">
+                                    Copy
+                                </button>
+                            </div>
+                            """,
+                            height=50,
+                        )
 
                 if save_clicked:
                     final_tracks = [t for t in st.session_state.selected_tracks if t['id'] not in st.session_state.get('tracks_to_remove', set())]
