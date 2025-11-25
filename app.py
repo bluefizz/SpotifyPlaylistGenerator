@@ -119,8 +119,9 @@ st.markdown(
             z-index: 9999;
         }}
 
+        /* Move all Streamlit content DOWN */
         div.block-container {{
-            margin-top: 160px !important;
+            margin-top: 140px !important;
         }}
     </style>
 
