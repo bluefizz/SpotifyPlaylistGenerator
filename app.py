@@ -96,14 +96,14 @@ logo_base64 = get_logo_base64()
 st.markdown(
     f"""
     <div style="
-        position: absolute;
-        top: -20px;
+        position: fixed;
+        top: 0px;
         left: 15px;
         z-index: 9999;
     ">
         <img src="data:image/png;base64,{logo_base64}" style="width: 350px;">
     </div>
-    <div style="height: 60px;"></div>
+    <div style="height: 40px;"></div>
     """,
     unsafe_allow_html=True
 )
