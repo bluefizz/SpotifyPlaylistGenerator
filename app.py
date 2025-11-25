@@ -119,13 +119,12 @@ st.markdown(
             z-index: 9999;
         }}
 
-        /* Move all Streamlit content DOWN */
         div.block-container {{
-            margin-top: 140px !important;
+            margin-top: 160px !important;
         }}
     </style>
 
-    <img class="app-logo" src="data:image/png;base64,{logo_base64}" width="260">
+    <img class="app-logo" src="data:image/png;base64,{logo_base64}" width="360">
     """,
     unsafe_allow_html=True
 )
