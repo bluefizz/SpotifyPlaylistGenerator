@@ -100,13 +100,23 @@ def get_logo_base64():
 
 logo_base64 = get_logo_base64()
 
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 1rem !important;
+    margin-top: -2rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown(
     f"""
     <div style="
         position: relative;
-        top: -30px;
+        top: -40px;
         left: 0px;
         z-index: 9999;
+        text-align: center;
         margin-bottom: -20px;
     ">
         <img src="data:image/png;base64,{logo_base64}" style="width: 350px;">
