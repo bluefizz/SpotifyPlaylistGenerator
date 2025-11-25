@@ -100,21 +100,13 @@ def get_logo_base64():
 
 logo_base64 = get_logo_base64()
 
-st.markdown("""
-<style>
-.block-container {
-    padding-top: 1rem !important;
-    margin-top: -2rem !important;
-}
-</style>
-""", unsafe_allow_html=True)
 st.markdown(
     f"""
     <style>
         .app-logo {{
             position: fixed;
             top: 15px;
-            left: 20px;
+            left: 25px;
             z-index: 9999;
         }}
 
