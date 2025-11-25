@@ -1432,57 +1432,43 @@ def main():
             col_save, col_refill = st.columns(2)
             
             with col_save:
-                st.markdown("""
-                <style>
-                .small-btn {
-                    padding: 8px 14px;
-                    background:#2b6cff;
-                    border:none;
-                    border-radius:8px;
-                    color:white;
-                    font-size:14px;
-                    cursor:pointer;
-                }
-                .small-btn:hover {
-                    background:#4d8dff;
-                }
-                </style>
-            """, unsafe_allow_html=True)
+               upload_col, camera_col, save_col, copy_col = st.columns([1,1,2,1])
 
-            upload_col, camera_col, save_col, copy_col = st.columns([1,1,2,1])
+    final_image_bytes = None  # ✅ IMPORTANT
 
-            # hidden uploader
-            uploaded_cover = st.file_uploader(
-                "upload_hidden",
-                type=["jpg","jpeg","png"],
-                label_visibility="collapsed",
-                key="playlist_cover_uploader"
-            )
+    uploaded_cover = st.file_uploader(
+        "upload_hidden",
+        type=["jpg","jpeg","png"],
+        label_visibility="collapsed",
+        key="playlist_cover_uploader"
+    )
 
-            with upload_col:
-                st.markdown(
-                    "<button class='small-btn'>📁 Upload</button>",
-                    unsafe_allow_html=True
-                )
+    photo = st.camera_input("camera_hidden")
 
-            with camera_col:
-                st.markdown(
-                    "<button class='small-btn'>📸 Camera</button>",
-                    unsafe_allow_html=True
-                )
+    if uploaded_cover is not None:
+        final_image_bytes = uploaded_cover.getvalue()
 
-            with save_col:
-                save_clicked = st.button(
-                    "💾 Save Playlist",
-                    type="primary",
-                    use_container_width=True
-                )
+    if photo is not None:
+        final_image_bytes = photo.getvalue()
 
-            with copy_col:
-                playlist_url = st.session_state.get("created_playlist_url")
-                if playlist_url:
-                    if st.button("📋 Copy", use_container_width=True):
-                        st.session_state["copy_trigger"] = True
+    with upload_col:
+        st.button("📁 Upload", use_container_width=True)
+
+    with camera_col:
+        st.button("📸 Camera", use_container_width=True)
+
+    with save_col:
+        save_clicked = st.button(
+            "💾 Save Playlist",
+            type="primary",
+            use_container_width=True
+        )
+
+    with copy_col:
+        playlist_url = st.session_state.get("created_playlist_url")
+        if playlist_url:
+            if st.button("📋 Copy", use_container_width=True):
+                st.session_state["copy_trigger"] = True
                 if save_clicked:
                     final_tracks = [t for t in st.session_state.selected_tracks if t['id'] not in st.session_state.get('tracks_to_remove', set())]
                     
