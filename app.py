@@ -112,19 +112,19 @@ st.markdown("""
 st.markdown(
     f"""
     <style>
-        .logo-container {{
+        .app-logo {{
             position: fixed;
             top: 10px;
-            left: 20px;
+            left: 10px;
             z-index: 9999;
         }}
-        body {{
-            margin-top: 120px !important;
+        /* reduce top padding caused by Streamlit */
+        .block-container {{
+            padding-top: 120px !important;
         }}
     </style>
-    <div class="logo-container">
-        <img src="data:image/png;base64,{logo_base64}" style="width: 260px;">
-    </div>
+
+    <img class="app-logo" src="data:image/png;base64,{logo_base64}" width="260">
     """,
     unsafe_allow_html=True
 )
