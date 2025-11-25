@@ -97,11 +97,11 @@ st.markdown(
     f"""
     <div style="
         position: absolute;
-        top: 10px;
+        top: -20px;
         left: 15px;
         z-index: 9999;
     ">
-        <img src="data:image/png;base64,{logo_base64}" style="width: 250px;">
+        <img src="data:image/png;base64,{logo_base64}" style="width: 350px;">
     </div>
     <div style="height: 100px;"></div>
     """,
