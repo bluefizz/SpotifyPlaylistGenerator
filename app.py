@@ -1650,7 +1650,7 @@ def main():
                         st.rerun()
 
 
-    with bottom_right:
+        with bottom_right:
             st.subheader("⭐ Top Consensus Songs (Not in the Playlist)")
             
             current_selected_ids = {t['id'] for t in selected_tracks if t['id'] not in st.session_state.get('tracks_to_remove', set())}
