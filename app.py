@@ -84,6 +84,18 @@ st.markdown("""
     border-radius: 6px;
 }
 
+
+.stButton>button[kind="secondary"],
+.stButton>button[kind="danger"] {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+}
+
+/* Make checkboxes / radios use primary blue accent */
+input[type="checkbox"],
+input[type="radio"] {
+    accent-color: var(--primary-color);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1001,12 +1013,12 @@ def process_image_for_spotify(image_bytes):
     return None  # couldn't get under 256 KB
 
 def main():
-    # st.title("🎵 Crowdsync - Party Playlist Generator")
-    st.markdown("Crowdsync is an intelligent party-playlist generator that blends the music tastes of you and your friends into one perfectly balanced playlist. Simply enter your guests' Spotify usernames, scan their public playlists, choose the genres and settings you want — and Crowdsync builds a personalized party soundtrack based on everyone's real listening history.")
+    # st.title("🎵 CrowdSync - Party Playlist Generator")
+    st.markdown("CrowdSync is an intelligent party-playlist generator that blends the music tastes of you and your friends into one perfectly balanced playlist. Simply enter your guests' Spotify usernames, scan their public playlists, choose the genres and settings you want — and CrowdSync builds a personalized party soundtrack based on everyone's real listening history.")
     
     st.info("""
     💡 **Tip for Best Results:**  
-    For a more accurate and personalized mix, guests should temporarily make some of their playlists public and ensure these public playlists are actually linked to their Spotify profile. When making playlists public, also select "Add to your profile" to allow Crowdsync to access them. The more public playlists available, the better the playlist will reflect everyone's taste!
+    For a more accurate and personalized mix, guests should temporarily make some of their playlists public and ensure these public playlists are actually linked to their Spotify profile. When making playlists public, also select "Add to your profile" to allow CrowdSync to access them. The more public playlists available, the better the playlist will reflect everyone's taste!
     """)
 
     # 🔐 NEW: use the login/authentication flow first
@@ -1109,7 +1121,7 @@ def main():
         
         st.markdown("---")
         
-        can_scan = st.session_state.get('all_validated', False)
+        can_scan = st.session_state.get('all_validated', False) and 'validated_guests' in st.session_state
         
         if guests and st.button("🔍 Scan Playlists and Gather Music Taste", type="primary", key="gather_data_btn", disabled=not can_scan):
             if not guests:
@@ -1266,13 +1278,31 @@ def main():
             st.markdown("**Playlist Settings**")
             
             st.markdown("*Playlist Name*")
-            playlist_name = st.text_input("Playlist name", "Crowdsync Playlist", label_visibility="collapsed", key="playlist_name_input")
+            playlist_name = st.text_input("Playlist name", "CrowdSync Playlist", label_visibility="collapsed", key="playlist_name_input")
             
             st.markdown("*Number of Tracks*")
             num_tracks = st.number_input("Number of tracks", min_value=10, max_value=200, value=40, label_visibility="collapsed")
             
             st.markdown("*Allocation Mode*")
             allocation_mode = st.radio("Allocation mode", ["Equal", "Focus"], label_visibility="collapsed")
+
+        # Cover image controls (top-right, under Allocation Mode)
+        st.markdown("## 📷 Upload Cover")
+        uploaded_cover = st.file_uploader(
+            "Upload cover",
+            type=["jpg","jpeg","png"],
+            key="playlist_cover_uploader"
+        )
+
+        photo = st.camera_input("📸 Take a photo")
+
+        # Store final image bytes for later playlist cover upload
+        final_image_bytes = None
+        if photo is not None:
+            final_image_bytes = photo.getvalue()
+        elif uploaded_cover is not None:
+            final_image_bytes = uploaded_cover.getvalue()
+
             
             if allocation_mode == "Focus":
                 st.info("⚙️ Set weights below")
@@ -1324,7 +1354,7 @@ def main():
                     0, 
                     100, 
                     default_value,
-                    step=10,
+                    step=5,
                     key=f"weight_{guest}"
                 )
                 st.session_state.user_weight_values[guest] = weight
@@ -1381,6 +1411,9 @@ def main():
                     )
                     
                     st.session_state.selected_tracks = selected_tracks
+                    # Initialize random display order for tracks (persist across edits)
+                    st.session_state.track_display_order = [t['id'] for t in selected_tracks]
+                    random.shuffle(st.session_state.track_display_order)
                     st.session_state.filtered_tracks = filtered_tracks
                     st.session_state.allocation_info = allocation_info
                     st.session_state.genre_contribution = genre_contribution
@@ -1433,51 +1466,11 @@ def main():
             col_save, col_refill = st.columns(2)
             
             with col_save:
-                st.markdown("""
-            <style>
-            .flex-row {
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                width: 100%;
-                gap: 20px;
-            }
-            .flex-item {
-                flex: 1;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-
-            st.markdown('<div class="flex-row">', unsafe_allow_html=True)
-
-            col1 = st.container()
-            col2 = st.container()
-            col3 = st.container()
-
-            with col1:
-                uploaded_cover = st.file_uploader(
-                    "Upload cover",
-                    type=["jpg","jpeg","png"],
-                    key="playlist_cover_uploader"
-                )
-
-            with col2:
-                photo = st.camera_input("📸 Take a photo")
-
-            # ✅ FIX: define final_image_bytes here
-            final_image_bytes = None
-            if photo is not None:
-                final_image_bytes = photo.getvalue()
-            elif uploaded_cover is not None:
-                final_image_bytes = uploaded_cover.getvalue()
-
-            with col3:
                 save_clicked = st.button(
                     "💾 Save Playlist",
                     type="primary",
                     use_container_width=True
                 )
-
 
             st.markdown('</div>', unsafe_allow_html=True)
             if save_clicked:
@@ -1522,11 +1515,15 @@ def main():
                                         st.warning(f"Playlist created, but the cover image could not be processed or uploaded: {cover_err}")
                                 
                                 st.success(f"🎉 Public playlist '{playlist_name}' created successfully!")
-                                st.markdown("### 🔗 Playlist Link")
                                 playlist_url = st.session_state.get("created_playlist_url")
 
                                 if playlist_url:
+                                    st.markdown("### 🔗 Open in Spotify")
+                                    st.markdown(f"[➡️ **Open in Spotify**]({playlist_url})")
+                                    st.markdown("### 🔗 Playlist Link")
                                     st.text_input("Playlist URL", playlist_url)
+                                else:
+                                    st.markdown("### 🔗 Playlist Link")
                             
                                 playlist_url = playlist['external_urls']['spotify']
                                 st.session_state["created_playlist_url"] = playlist_url
@@ -1556,9 +1553,7 @@ def main():
                         st.session_state.selected_tracks = kept_tracks + new_tracks
                         st.session_state.tracks_to_remove = set()
                         
-                        if 'display_order' in st.session_state:
-                            del st.session_state.display_order
-                        
+                        # display order is preserved via track_display_order; no reset needed
                         st.rerun()
         
         with metrics_col2:
@@ -1615,44 +1610,47 @@ def main():
         
         with bottom_left:
             st.subheader("🎵 Track List")
-            
+
             if 'tracks_to_remove' not in st.session_state:
                 st.session_state.tracks_to_remove = set()
-            
+
+            # Build current list of tracks (excluding removed ones)
             display_tracks = [t for t in selected_tracks if t['id'] not in st.session_state.tracks_to_remove]
-            
-            if 'display_order' not in st.session_state or len(st.session_state.display_order) != len(display_tracks):
-                st.session_state.display_order = list(range(len(display_tracks)))
-                random.shuffle(st.session_state.display_order)
-            
-            for display_idx in st.session_state.display_order:
-                if display_idx >= len(display_tracks):
-                    continue
-                    
-                track = display_tracks[display_idx]
-                
+
+            # Ensure we have a persistent display order based on track IDs
+            if 'track_display_order' not in st.session_state:
+                st.session_state.track_display_order = [t['id'] for t in selected_tracks]
+
+            order = st.session_state.track_display_order
+            order_index = {tid: i for i, tid in enumerate(order)}
+
+            # Sort tracks by their stored order; new tracks (not in order) go at the end
+            display_tracks_sorted = sorted(
+                display_tracks,
+                key=lambda t: order_index.get(t['id'], len(order) + 1)
+            )
+
+            for position, track in enumerate(display_tracks_sorted, start=1):
+
                 col_track, col_button = st.columns([5, 1])
-                
+
                 with col_track:
                     genres_display = ", ".join(track['genres'][:3]) if track['genres'] else "No genre"
                     year = parse_release_year(track['album_release_date'])
                     artists_display = ', '.join([a for a in track['artists'] if a]) or "Unknown Artist"
                     friend_display_name = get_display_name(track['user_id'])
-                    
-                    actual_position = st.session_state.display_order.index(display_idx) + 1
-                    
+
                     st.markdown(f"""
-                    **{actual_position}. {track['name']}** by {artists_display}  
+                    **{position}. {track['name']}** by {artists_display}  
                     `Friend: {friend_display_name}` • `Popularity: {track['popularity']}` • `Year: {year}` • `Genres: {genres_display}`
                     """)
-                
+
                 with col_button:
-                    if st.button("🗑️", key=f"remove_{track['id']}_{display_idx}"):
+                    if st.button("🗑️", key=f"remove_{track['id']}_{position}"):
                         st.session_state.tracks_to_remove.add(track['id'])
-                        if 'display_order' in st.session_state:
-                            del st.session_state.display_order
                         st.rerun()
-        
+
+
         with bottom_right:
             st.subheader("⭐ Top Consensus Songs (Not in the Playlist)")
             
@@ -1682,8 +1680,8 @@ def main():
                     with col_add:
                         if st.button("➕", key=f"add_{track['id']}"):
                             st.session_state.selected_tracks.append(track)
-                            if 'display_order' in st.session_state:
-                                del st.session_state.display_order
+                            if 'track_display_order' in st.session_state and track['id'] not in st.session_state.track_display_order:
+                                st.session_state.track_display_order.append(track['id'])
                             st.rerun()
             else:
                 st.info("No additional consensus tracks found that aren't already in the playlist.")
