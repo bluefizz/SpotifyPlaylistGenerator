@@ -1524,11 +1524,38 @@ def main():
                                 st.markdown("### 🔗 Playlist Link")
                                 playlist_url = st.session_state.get("created_playlist_url")
 
-                                if playlist_url:
-                                    st.text_input("Playlist URL", playlist_url)
-                            
+                                # Save playlist URL first
                                 playlist_url = playlist['external_urls']['spotify']
                                 st.session_state["created_playlist_url"] = playlist_url
+
+                                st.success(f"🎉 Public playlist '{playlist_name}' created successfully!")
+
+                                # ✅ Clickable + auto-copy link
+                                st.markdown(
+                                    f"""
+                                    <div style="display:flex; align-items:center; gap:10px; font-size:18px;">
+                                        <a href="{playlist_url}" target="_blank" style="color:#4DB8FF; font-weight:bold; text-decoration:none;">
+                                            🔗 Open Playlist
+                                        </a>
+                                        <span id="copy-status" style="color:lightgreen; opacity:0;">✅ Copied!</span>
+                                    </div>
+
+                                    <script>
+                                    const text = "{playlist_url}";
+                                    navigator.clipboard.writeText(text).then(() => {{
+                                        const el = document.getElementById("copy-status");
+                                        if (el) {{
+                                            el.style.opacity = 1;
+                                            setTimeout(() => {{
+                                                el.style.opacity = 0;
+                                            }}, 2000);
+                                        }}
+                                    }});
+                                    </script>
+                                    """,
+                                    unsafe_allow_html=True
+                                )
+
                                 
                                 if skipped:
                                     st.warning(f"⚠️ {len(skipped)} tracks were unavailable and skipped")
