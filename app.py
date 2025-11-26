@@ -102,84 +102,42 @@ input[type="radio"] {
 st.markdown("""
 <style>
 
-/* Center the entire camera input component */
+/* Force the whole camera component to be small and centered */
 [data-testid="stCameraInput"] {
+    width: 220px !important;
+    margin: 0 auto !important;
     display: flex !important;
     flex-direction: column;
     align-items: center !important;
     justify-content: center !important;
+    padding: 0 !important;
 }
 
-/* Center the label */
-[data-testid="stCameraInput"] label {
-    text-align: center !important;
-    width: 100%;
+/* Prevent Streamlit from forcing full width */
+[data-testid="stCameraInput"] > div {
+    width: 220px !important;
+    max-width: 220px !important;
+    margin: 0 auto !important;
 }
 
-/* Make camera preview smaller */
-[data-testid="stCameraInput"] video {
+/* Camera preview size */
+[data-testid="stCameraInput"] video,
+[data-testid="stCameraInput"] canvas {
     width: 200px !important;
     height: 200px !important;
     object-fit: cover;
     border-radius: 12px;
 }
 
-/* Make captured image preview smaller */
-[data-testid="stCameraInput"] canvas {
-    width: 200px !important;
-    height: 200px !important;
-    border-radius: 12px;
-}
-
-/* Center the "Take Photo" button */
+/* Center label + button */
+[data-testid="stCameraInput"] label,
 [data-testid="stCameraInput"] button {
-    margin-top: 10px;
-    align-self: center !important;
-}
-
-</style>
-""", unsafe_allow_html=True)
-st.markdown("""
-<style>
-
-/* Center the entire camera input component */
-[data-testid="stCameraInput"] {
-    display: flex !important;
-    flex-direction: column;
-    align-items: center !important;
-    justify-content: center !important;
-}
-
-/* Center the label */
-[data-testid="stCameraInput"] label {
     text-align: center !important;
-    width: 100%;
-}
-
-/* Make camera preview smaller */
-[data-testid="stCameraInput"] video {
-    width: 200px !important;
-    height: 200px !important;
-    object-fit: cover;
-    border-radius: 12px;
-}
-
-/* Make captured image preview smaller */
-[data-testid="stCameraInput"] canvas {
-    width: 200px !important;
-    height: 200px !important;
-    border-radius: 12px;
-}
-
-/* Center the "Take Photo" button */
-[data-testid="stCameraInput"] button {
-    margin-top: 10px;
     align-self: center !important;
 }
 
 </style>
 """, unsafe_allow_html=True)
-
 
 
 def get_logo_base64():
