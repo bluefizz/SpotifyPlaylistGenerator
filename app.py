@@ -1522,7 +1522,7 @@ def main():
                             except Exception as e:
                                 st.error(f"Error creating playlist: {str(e)}")
             
-            with col_refill:
+            with refill_col:
                 if st.session_state.get('tracks_to_remove'):
                     if st.button("🔄 Refill Removed Slots", key="refill_slots_btn"):
                         permanently_removed = st.session_state.tracks_to_remove.copy()
