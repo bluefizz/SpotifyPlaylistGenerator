@@ -1429,61 +1429,47 @@ def main():
             
             st.markdown("---")
             
-            col_save, col_refill = st.columns(2)
-            
-            with col_save:
-                st.markdown("""
-            <style>
-            .flex-row {
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                width: 100%;
-                gap: 20px;
-            }
-            .flex-item {
-                flex: 1;
-            }
-            </style>
-            """, unsafe_allow_html=True)
+            upload_col, camera_col, save_col, copy_col, refill_col = st.columns([2,2,1.5,1.5,1.5])
 
-            st.markdown('<div class="flex-row">', unsafe_allow_html=True)
+        with upload_col:
+            uploaded_cover = st.file_uploader(
+                "Upload cover",
+                type=["jpg","jpeg","png"],
+                key="playlist_cover_uploader",
+            )
 
-            col1 = st.container()
-            col2 = st.container()
-            col3 = st.container()
+        with camera_col:
+            photo = st.camera_input("📸 Take a photo")
 
-            with col1:
-                uploaded_cover = st.file_uploader(
-                    "Upload cover",
-                    type=["jpg","jpeg","png"],
-                    key="playlist_cover_uploader"
-                )
+     
+        final_image_bytes = None
+        if photo:
+            final_image_bytes = photo.getvalue()
+        elif uploaded_cover:
+            final_image_bytes = uploaded_cover.getvalue()
 
-            with col2:
-                photo = st.camera_input("📸 Take a photo")
+        with save_col:
+            save_clicked = st.button(
+                "💾 Save Playlist",
+                type="primary",
+                use_container_width=True
+            )
 
-            # ✅ FIX: define final_image_bytes here
-            final_image_bytes = None
-            if photo is not None:
-                final_image_bytes = photo.getvalue()
-            elif uploaded_cover is not None:
-                final_image_bytes = uploaded_cover.getvalue()
+        with copy_col:
+            playlist_url = st.session_state.get("created_playlist_url")
+            if playlist_url:
+                if st.button("📋 Copy Link"):
+                    st.session_state["copy_trigger"] = True
 
-            with col3:
-                save_clicked = st.button(
-                    "💾 Save Playlist",
-                    type="primary",
-                    use_container_width=True
-                )
+        with refill_col:
+            if st.session_state.get('tracks_to_remove'):
+                refill_clicked = st.button("🔄 Refill")
 
-                playlist_url = st.session_state.get("created_playlist_url")
-                if playlist_url:
-                    st.text_input("Playlist Link", playlist_url)
-                    if st.button("📋 Copy"):
-                        st.session_state["copy_trigger"] = True
-
-            st.markdown('</div>', unsafe_allow_html=True)
+        
+        if playlist_url and st.session_state.get("copy_trigger"):
+            st.code(playlist_url)
+            st.info("✅ Link copied!")
+            st.session_state["copy_trigger"] = False
             if save_clicked:
                     final_tracks = [t for t in st.session_state.selected_tracks if t['id'] not in st.session_state.get('tracks_to_remove', set())]
                     
@@ -1529,26 +1515,6 @@ def main():
                             
                                 playlist_url = playlist['external_urls']['spotify']
                                 st.session_state["created_playlist_url"] = playlist_url
-
-                                st.markdown("### 🔗 Playlist Link")
-
-                                components.html(
-                                    f"""
-                                    <div style="display:flex; align-items:center; gap:8px;">
-                                        <input id="playlist-link-input"
-                                            type="text"
-                                            value="{playlist_url}"
-                                            style="width:100%; padding:6px; border-radius:6px; border:1px solid #ccc;"
-                                            readonly />
-                                        <button style="padding:6px 10px; cursor:pointer; border-radius:6px; border:none; background:#0E6EFF; color:white;"
-                                            onclick="navigator.clipboard.writeText(document.getElementById('playlist-link-input').value)">
-                                            Copy
-                                        </button>
-                                    </div>
-                                    """,
-                                    height=50,
-                                )                                                                    
-                                st.markdown(f"[Open in Spotify]({playlist['external_urls']['spotify']})")
                                 
                                 if skipped:
                                     st.warning(f"⚠️ {len(skipped)} tracks were unavailable and skipped")
