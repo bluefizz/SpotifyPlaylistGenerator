@@ -102,41 +102,41 @@ input[type="radio"] {
 st.markdown("""
 <style>
 
-/* Keep container tight but allow room for label & button */
-[data-testid="stCameraInput"] {
-    width: 320px !important;
-    margin: 0 auto !important;
 
-    display: flex !important;
+.camera-wrapper {
+    width: 300px;
+    height: 350px;   /* space for label + button */
+    margin: 0 auto;
+    display: flex;
     flex-direction: column;
-    align-items: center !important;
-    justify-content: flex-start !important;
-
-    padding: 10px 0 !important;
-
-    border-radius: 12px;
+    align-items: center;
+    justify-content: flex-start;
+    overflow: hidden;
+    border-radius: 15px;
 }
 
-/* Stop the column from stretching vertically */
-[data-testid="column"] > div:has([data-testid="stCameraInput"]) {
+
+[data-testid="stCameraInput"] {
+    width: 300px !important;
     height: auto !important;
-    min-height: auto !important;
+    margin: 0 auto !important;
+    flex: 0 0 auto !important;   /* <-- stops vertical stretching */
 }
 
-/* Bigger square preview */
+
 [data-testid="stCameraInput"] video,
 [data-testid="stCameraInput"] canvas {
-    width: 280px !important;
-    height: 280px !important;
+    width: 260px !important;
+    height: 260px !important;
     object-fit: cover;
     border-radius: 12px;
 }
 
-/* Center label + button normally */
+
 [data-testid="stCameraInput"] label,
 [data-testid="stCameraInput"] button {
-    text-align: center !important;
     align-self: center !important;
+    text-align: center !important;
 }
 
 </style>
