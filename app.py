@@ -102,36 +102,49 @@ input[type="radio"] {
 st.markdown("""
 <style>
 
-
-[data-testid="column"] [data-testid="stCameraInput"] {
-    align-self: flex-start !important;
-}
-
-
+/* MAIN FIX: make the camera container square */
 [data-testid="stCameraInput"] {
-    width: 220px !important;
-    height: auto !important;
+    width: 230px !important;
+    height: 230px !important;
+    max-height: 230px !important;
     margin: 0 auto !important;
-    padding: 0 !important;
+    
     display: flex !important;
     flex-direction: column;
     align-items: center !important;
-    justify-content: center !important;
+    justify-content: flex-start !important;
+
+    overflow: hidden !important;   /* <-- removes long grey box */
+    border-radius: 12px;
 }
 
-
+/* Prevent parent column from stretching */
 [data-testid="column"] > div:has([data-testid="stCameraInput"]) {
     height: auto !important;
-    min-height: auto !important;
+    max-height: 250px !important;
 }
 
+/* Square live preview */
+[data-testid="stCameraInput"] video {
+    width: 200px !important;
+    height: 200px !important;
+    object-fit: cover;
+    border-radius: 12px;
+}
 
-[data-testid="stCameraInput"] video,
+/* Square captured preview */
 [data-testid="stCameraInput"] canvas {
     width: 200px !important;
     height: 200px !important;
     object-fit: cover;
     border-radius: 12px;
+}
+
+/* Center label + button */
+[data-testid="stCameraInput"] label,
+[data-testid="stCameraInput"] button {
+    text-align: center !important;
+    align-self: center !important;
 }
 
 </style>
