@@ -1477,6 +1477,11 @@ def main():
                     use_container_width=True
                 )
 
+                playlist_url = st.session_state.get("created_playlist_url")
+                if playlist_url:
+                    st.text_input("Playlist Link", playlist_url)
+                    if st.button("📋 Copy"):
+                        st.session_state["copy_trigger"] = True
 
             st.markdown('</div>', unsafe_allow_html=True)
             if save_clicked:
@@ -1521,8 +1526,7 @@ def main():
                                         st.warning(f"Playlist created, but the cover image could not be processed or uploaded: {cover_err}")
                                 
                                 st.success(f"🎉 Public playlist '{playlist_name}' created successfully!")
-                                st.markdown("### 🔗 Playlist Link")
-                                playlist_url = st.session_state.get("created_playlist_url")
+                        
 
                                 if playlist_url:
                                     st.text_input("Playlist URL", playlist_url)
