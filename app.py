@@ -1012,12 +1012,12 @@ def process_image_for_spotify(image_bytes):
     return None  # couldn't get under 256 KB
 
 def main():
-    # st.title("🎵 Crowdsync - Party Playlist Generator")
-    st.markdown("Crowdsync is an intelligent party-playlist generator that blends the music tastes of you and your friends into one perfectly balanced playlist. Simply enter your guests' Spotify usernames, scan their public playlists, choose the genres and settings you want — and Crowdsync builds a personalized party soundtrack based on everyone's real listening history.")
+    # st.title("🎵 CrowdSync - Party Playlist Generator")
+    st.markdown("CrowdSync is an intelligent party-playlist generator that blends the music tastes of you and your friends into one perfectly balanced playlist. Simply enter your guests' Spotify usernames, scan their public playlists, choose the genres and settings you want — and CrowdSync builds a personalized party soundtrack based on everyone's real listening history.")
     
     st.info("""
     💡 **Tip for Best Results:**  
-    For a more accurate and personalized mix, guests should temporarily make some of their playlists public and ensure these public playlists are actually linked to their Spotify profile. When making playlists public, also select "Add to your profile" to allow Crowdsync to access them. The more public playlists available, the better the playlist will reflect everyone's taste!
+    For a more accurate and personalized mix, guests should temporarily make some of their playlists public and ensure these public playlists are actually linked to their Spotify profile. When making playlists public, also select "Add to your profile" to allow CrowdSync to access them. The more public playlists available, the better the playlist will reflect everyone's taste!
     """)
 
     # 🔐 NEW: use the login/authentication flow first
