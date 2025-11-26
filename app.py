@@ -1,4 +1,3 @@
-
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -36,7 +35,7 @@ def clean_spotify_cache():
             print(f"Failed to delete {f}: {e}")
 
 # Call this early in your app, before Spotify OAuth
-#clean_spotify_cache()
+clean_spotify_cache()
 
 # Page config 
 st.set_page_config(
@@ -239,7 +238,7 @@ def ensure_spotify_authenticated():
 
     # If no token, check for Spotify redirect
     if not token_info:
-        query_params = st.query_params
+        query_params = st.experimental_get_query_params()
         if "code" in query_params:
             code = query_params["code"][0]
             try:
@@ -247,7 +246,7 @@ def ensure_spotify_authenticated():
                 # Some spotipy versions return dict, sometimes different object — handle dict case
                 if isinstance(token_info, dict):
                     st.session_state["token_info"] = token_info
-                st.query_params.update()  # clean URL
+                st.experimental_set_query_params()  # clean URL
             except Exception as e:
                 st.error(f"Error fetching access token: {e}")
                 st.stop()
@@ -473,15 +472,7 @@ def get_user_playlists_data(sp, username, market):
         while results:
             playlists.extend(results['items'])
             if results['next']:
-                try:
-                    results = sp.next(results)
-                except spotipy.SpotifyException as e:
-                    if hasattr(e, "http_status") and e.http_status == 429:
-                        st.warning(f"⏳ Spotify rate limit hit while fetching playlists for {username}. Using available playlists.")
-                        return tracks_data   # ✅ return what we have so far
-                    else:
-                        st.warning(f"⚠️ Error fetching playlists for {username}: {e}")
-                        return tracks_data
+                results = sp.next(results)
             else:
                 break
         
@@ -538,27 +529,21 @@ def get_all_genres_from_tracks(tracks):
     return sorted(list(all_genres))
 
 def get_artist_genres(sp, artist_ids):
-    """Fetch genres for multiple artists - SAFE against rate limits"""
+    """Fetch genres for multiple artists - NO CACHING"""
     genres_map = {}
-
+    
     for i in range(0, len(artist_ids), 50):
         batch = artist_ids[i:i+50]
         try:
             artists_data = sp.artists(batch)
-        except spotipy.SpotifyException as e:
-            if e.http_status == 429:
-                st.warning("⏳ Spotify rate limit hit. Skipping remaining genre fetches.")
-                return genres_map  # ✅ return what we have instead of waiting 12 hours
-            else:
-                st.warning(f"Error fetching artist genres: {e}")
-                continue
-
-        for artist in artists_data['artists']:
-            if artist:
-                genres_map[artist['id']] = artist.get('genres', [])
-
-        time.sleep(0.1)
-
+            for artist in artists_data['artists']:
+                if artist:
+                    genres = artist.get('genres', [])
+                    genres_map[artist['id']] = genres
+            time.sleep(0.1)
+        except Exception as e:
+            st.warning(f"Error fetching artist genres: {str(e)}")
+    
     return genres_map
 
 def parse_release_year(release_date):
