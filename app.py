@@ -103,24 +103,26 @@ st.markdown("""
 <style>
 
 
-.camera-wrapper {
-    width: 300px;
-    height: 350px;   /* space for label + button */
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    overflow: hidden;
-    border-radius: 15px;
+[data-testid="stCameraInput"] {
+    background: none !important;
 }
 
 
-[data-testid="stCameraInput"] {
-    width: 300px !important;
-    height: auto !important;
-    margin: 0 auto !important;
-    flex: 0 0 auto !important;   /* <-- stops vertical stretching */
+[data-testid="column"] > div {
+    background: none !important;
+    padding: 0 !important;
+}
+
+
+.camera-box {
+    width: 260px;
+    height: 260px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    border-radius: 12px;
 }
 
 
@@ -130,13 +132,6 @@ st.markdown("""
     height: 260px !important;
     object-fit: cover;
     border-radius: 12px;
-}
-
-
-[data-testid="stCameraInput"] label,
-[data-testid="stCameraInput"] button {
-    align-self: center !important;
-    text-align: center !important;
 }
 
 </style>
@@ -1336,7 +1331,9 @@ def main():
             key="playlist_cover_uploader"
         )
 
+        st.markdown('<div class="camera-box">', unsafe_allow_html=True)
         photo = st.camera_input("📸 Take a photo")
+        st.markdown('</div>', unsafe_allow_html=True)
 
         # Store final image bytes for later playlist cover upload
         final_image_bytes = None
