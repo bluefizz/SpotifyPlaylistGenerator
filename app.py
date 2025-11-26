@@ -1477,11 +1477,6 @@ def main():
                     use_container_width=True
                 )
 
-                playlist_url = st.session_state.get("created_playlist_url")
-                if playlist_url:
-                    st.text_input("Playlist Link", playlist_url)
-                    if st.button("📋 Copy"):
-                        st.session_state["copy_trigger"] = True
 
             st.markdown('</div>', unsafe_allow_html=True)
             if save_clicked:
