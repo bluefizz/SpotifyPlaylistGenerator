@@ -1,5 +1,4 @@
 
-
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -100,43 +99,6 @@ input[type="radio"] {
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-<style>
-
-
-[data-testid="stCameraInput"] {
-    background: none !important;
-}
-
-
-[data-testid="column"] > div {
-    background: none !important;
-    padding: 0 !important;
-}
-
-
-.camera-box {
-    width: 260px;
-    height: 260px;
-    margin: 0 auto;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
-    border-radius: 12px;
-}
-
-
-[data-testid="stCameraInput"] video,
-[data-testid="stCameraInput"] canvas {
-    width: 260px !important;
-    height: 260px !important;
-    object-fit: cover;
-    border-radius: 12px;
-}
-
-</style>
-""", unsafe_allow_html=True)
 
 def get_logo_base64():
     with open("crowdsync.png", "rb") as f:
@@ -1332,9 +1294,7 @@ def main():
             key="playlist_cover_uploader"
         )
 
-        st.markdown('<div class="camera-box">', unsafe_allow_html=True)
         photo = st.camera_input("📸 Take a photo")
-        st.markdown('</div>', unsafe_allow_html=True)
 
         # Store final image bytes for later playlist cover upload
         final_image_bytes = None
