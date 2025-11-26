@@ -1,4 +1,5 @@
 
+
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -102,27 +103,21 @@ input[type="radio"] {
 st.markdown("""
 <style>
 
+
 [data-testid="stCameraInput"] {
     background: none !important;
 }
 
-/* Remove Streamlit padding and giant area */
-[data-testid="stCameraInput"] > div {
-    height: 320px !important;
-    max-height: 320px !important;
-    padding: 0 !important;
-}
 
-/* Remove column padding */
 [data-testid="column"] > div {
     background: none !important;
     padding: 0 !important;
 }
 
-/* Our wrapper */
+
 .camera-box {
-    width: 320px;
-    height: 320px;
+    width: 260px;
+    height: 260px;
     margin: 0 auto;
     display: flex;
     justify-content: center;
@@ -131,15 +126,15 @@ st.markdown("""
     border-radius: 12px;
 }
 
-/* Force the camera preview to be square */
-.camera-box video,
-.camera-box canvas {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
+
+[data-testid="stCameraInput"] video,
+[data-testid="stCameraInput"] canvas {
+    width: 260px !important;
+    height: 260px !important;
+    object-fit: cover;
     border-radius: 12px;
 }
-            
+
 </style>
 """, unsafe_allow_html=True)
 
