@@ -239,7 +239,7 @@ def ensure_spotify_authenticated():
 
     # If no token, check for Spotify redirect
     if not token_info:
-        query_params = st.experimental_get_query_params()
+        query_params = st.query_params
         if "code" in query_params:
             code = query_params["code"][0]
             try:
@@ -247,7 +247,7 @@ def ensure_spotify_authenticated():
                 # Some spotipy versions return dict, sometimes different object — handle dict case
                 if isinstance(token_info, dict):
                     st.session_state["token_info"] = token_info
-                st.experimental_set_query_params()  # clean URL
+                st.query_params.update()  # clean URL
             except Exception as e:
                 st.error(f"Error fetching access token: {e}")
                 st.stop()
