@@ -102,25 +102,30 @@ input[type="radio"] {
 st.markdown("""
 <style>
 
-/* Force the whole camera component to be small and centered */
+
+[data-testid="column"] [data-testid="stCameraInput"] {
+    align-self: flex-start !important;
+}
+
+
 [data-testid="stCameraInput"] {
     width: 220px !important;
+    height: auto !important;
     margin: 0 auto !important;
+    padding: 0 !important;
     display: flex !important;
     flex-direction: column;
     align-items: center !important;
     justify-content: center !important;
-    padding: 0 !important;
 }
 
-/* Prevent Streamlit from forcing full width */
-[data-testid="stCameraInput"] > div {
-    width: 220px !important;
-    max-width: 220px !important;
-    margin: 0 auto !important;
+
+[data-testid="column"] > div:has([data-testid="stCameraInput"]) {
+    height: auto !important;
+    min-height: auto !important;
 }
 
-/* Camera preview size */
+
 [data-testid="stCameraInput"] video,
 [data-testid="stCameraInput"] canvas {
     width: 200px !important;
@@ -129,16 +134,8 @@ st.markdown("""
     border-radius: 12px;
 }
 
-/* Center label + button */
-[data-testid="stCameraInput"] label,
-[data-testid="stCameraInput"] button {
-    text-align: center !important;
-    align-self: center !important;
-}
-
 </style>
 """, unsafe_allow_html=True)
-
 
 def get_logo_base64():
     with open("crowdsync.png", "rb") as f:
