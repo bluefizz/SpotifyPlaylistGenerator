@@ -99,6 +99,88 @@ input[type="radio"] {
 </style>
 """, unsafe_allow_html=True)
 
+st.markdown("""
+<style>
+
+/* Center the entire camera input component */
+[data-testid="stCameraInput"] {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Center the label */
+[data-testid="stCameraInput"] label {
+    text-align: center !important;
+    width: 100%;
+}
+
+/* Make camera preview smaller */
+[data-testid="stCameraInput"] video {
+    width: 200px !important;
+    height: 200px !important;
+    object-fit: cover;
+    border-radius: 12px;
+}
+
+/* Make captured image preview smaller */
+[data-testid="stCameraInput"] canvas {
+    width: 200px !important;
+    height: 200px !important;
+    border-radius: 12px;
+}
+
+/* Center the "Take Photo" button */
+[data-testid="stCameraInput"] button {
+    margin-top: 10px;
+    align-self: center !important;
+}
+
+</style>
+""", unsafe_allow_html=True)
+st.markdown("""
+<style>
+
+/* Center the entire camera input component */
+[data-testid="stCameraInput"] {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Center the label */
+[data-testid="stCameraInput"] label {
+    text-align: center !important;
+    width: 100%;
+}
+
+/* Make camera preview smaller */
+[data-testid="stCameraInput"] video {
+    width: 200px !important;
+    height: 200px !important;
+    object-fit: cover;
+    border-radius: 12px;
+}
+
+/* Make captured image preview smaller */
+[data-testid="stCameraInput"] canvas {
+    width: 200px !important;
+    height: 200px !important;
+    border-radius: 12px;
+}
+
+/* Center the "Take Photo" button */
+[data-testid="stCameraInput"] button {
+    margin-top: 10px;
+    align-self: center !important;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
 
 def get_logo_base64():
     with open("crowdsync.png", "rb") as f:
