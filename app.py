@@ -471,8 +471,16 @@ def get_user_playlists_data(sp, username, market):
         results = sp.user_playlists(username)
         while results:
             playlists.extend(results['items'])
-            if results['next']:
-                results = sp.next(results)
+
+            if results.get('next'):
+                try:
+                    results = sp.next(results)
+                except spotipy.SpotifyException as e:
+                    if e.http_status == 429:
+                        st.warning(f"⏳ Spotify rate limit hit while scanning playlists for {username}. Skipping the rest.")
+                        break
+                    else:
+                        raise
             else:
                 break
         
@@ -485,10 +493,17 @@ def get_user_playlists_data(sp, username, market):
             results = sp.playlist_tracks(playlist['id'])
             tracks = results['items']
             
-            while results['next']:
-                results = sp.next(results)
-                tracks.extend(results['items'])
-            
+            while results.get('next'):
+                try:
+                    results = sp.next(results)
+                    tracks.extend(results['items'])
+                except spotipy.SpotifyException as e:
+                    if e.http_status == 429:
+                        st.warning(f"⏳ Rate limit hit while fetching tracks for {username}. Skipping remaining tracks.")
+                        break
+                    else:
+                        raise
+                
             for item in tracks:
                 if not item or not item['track']:
                     continue
